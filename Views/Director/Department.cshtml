@@ -1,0 +1,55 @@
+@{ Layout = null; }
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Phòng ban</title>
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+  <link rel="stylesheet" href="~/css/departments.css" asp-append-version="true">
+  <script src="~/js/departments.js" asp-append-version="true" defer></script>
+</head>
+<body>
+<div class="layout">
+  <partial name="_SidebarPartial" />
+  <main class="main departments-page">
+    <div class="topbar">
+      <div><h1 class="page-title">Phòng ban</h1><p class="page-sub">Theo dõi cơ cấu tổ chức, trưởng phòng và nhân sự toàn công ty.</p></div>
+      <span class="department-readonly"><i class="ti ti-eye" aria-hidden="true"></i> Chỉ xem</span>
+    </div>
+
+    <section class="departments-summary" aria-label="Tổng quan phòng ban">
+      <div class="kpi-card"><div class="kpi-label">Tổng phòng ban</div><div class="kpi-value" id="departmentTotal">—</div><div class="kpi-note">Toàn bộ cơ cấu công ty</div></div>
+      <div class="kpi-card"><div class="kpi-label">Đang hoạt động</div><div class="kpi-value" id="departmentActive">—</div><div class="kpi-note">Phòng ban đang vận hành</div></div>
+      <div class="kpi-card"><div class="kpi-label">Nhân sự hiện tại</div><div class="kpi-value" id="departmentEmployees">—</div><div class="kpi-note">Đang làm, thử việc và chờ duyệt nghỉ</div></div>
+    </section>
+
+    <section class="card department-directory" aria-labelledby="departmentHeading">
+      <div class="card-head"><div><h2 class="card-title" id="departmentHeading">Danh sách phòng ban</h2><p class="card-sub" id="departmentCount" role="status" aria-live="polite">Đang tải dữ liệu…</p></div></div>
+      <form class="department-filters" id="departmentFilters" role="search">
+        <label for="departmentSearch">Tìm phòng ban
+          <input class="form-control" type="search" id="departmentSearch" placeholder="Tên, mã phòng hoặc trưởng phòng" autocomplete="off">
+        </label>
+        <label for="departmentStatus">Trạng thái
+          <select class="form-control" id="departmentStatus"><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Ngừng hoạt động</option></select>
+        </label>
+      </form>
+      <div class="department-error" id="departmentError" role="alert" hidden><span>Không tải được danh sách phòng ban. Vui lòng thử lại.</span><button type="button" class="btn-mini" id="departmentRetry">Thử lại</button></div>
+      <div id="departmentResults" aria-busy="true">
+        <div class="department-table-region" tabindex="0" role="region" aria-label="Danh sách phòng ban">
+          <table class="department-table">
+            <colgroup><col class="department-col-name"><col class="department-col-manager"><col class="department-col-count"><col class="department-col-status"><col class="department-col-link"></colgroup>
+            <thead><tr><th scope="col">Phòng ban</th><th scope="col">Trưởng phòng</th><th scope="col" class="department-number">Nhân sự</th><th scope="col">Trạng thái</th><th scope="col"><span class="department-sr-only">Xem nhân sự</span></th></tr></thead>
+            <tbody id="departmentRows"><tr><td colspan="5" class="department-empty">Đang tải dữ liệu…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="department-cards" id="departmentCards" aria-label="Danh sách phòng ban trên điện thoại"></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

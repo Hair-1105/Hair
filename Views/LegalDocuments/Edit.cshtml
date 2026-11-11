@@ -1,0 +1,35 @@
+@model HanaMedia.ViewModels.LegalDocumentEditViewModel
+@using HanaMedia.Models
+@{ Layout = "_OperationsLayout"; ViewData["Title"] = Model.Id == 0 ? "Soạn hồ sơ Pháp chế" : "Cập nhật hồ sơ Pháp chế"; ViewData["Subtitle"] = "Lưu bản soạn để kiểm tra trước khi chuyển hợp đồng cho Booking."; }
+@section PageActions { <a class="ops-button" href="/LegalDocuments?kind=@Model.Kind&bookingId=@Model.BookingId">← Danh sách hồ sơ</a> }
+<div class="ops-editor">
+<section class="card ops-card"><h2 class="card-title">Nội dung hồ sơ</h2>
+<form method="post" action="/LegalDocuments/Save" enctype="multipart/form-data">
+  @Html.AntiForgeryToken()<div asp-validation-summary="All" role="alert"></div><input type="hidden" asp-for="Id"><input type="hidden" asp-for="Revision">
+  <div class="ops-form-grid">
+    <label class="ops-field">Loại hồ sơ<select asp-for="Kind" id="document-kind">@foreach (var kind in new[] { "booking", "employment", "policy" }) { <option value="@kind">@LegalDocument.KindLabel(kind)</option> }</select></label>
+    <label class="ops-field" id="booking-choice">Booking nhận hợp đồng<select asp-for="BookingId" asp-items="ViewBag.Bookings"><option value="">Chọn Booking</option></select></label>
+    <label class="ops-field" id="employee-choice">Nhân viên<select asp-for="EmployeeId" asp-items="ViewBag.Employees"><option value="">Chọn nhân viên</option></select></label>
+    <label class="ops-field full">Tiêu đề<input asp-for="Title" maxlength="200" required placeholder="Nhập tên hợp đồng hoặc nội quy"></label>
+    <label class="ops-field full">Nội dung<textarea asp-for="Content" rows="15" maxlength="100000" placeholder="Nhập nội dung hợp đồng hoặc nội quy…"></textarea></label>
+    <label class="ops-field full">Tệp đính kèm<input type="file" asp-for="Attachment" accept=".pdf,.docx,.jpg,.jpeg,.png"><span class="ops-muted">PDF, DOCX, JPG, PNG · Tối đa 25 MB</span></label>
+  </div>
+  @if (ViewBag.ExistingAttachment != null) { <p class="ops-muted">Tệp đang lưu: @ViewBag.ExistingAttachment. Chọn tệp mới để thay thế.</p> }
+  <div class="ops-form-footer"><button class="ops-button primary" type="submit">Lưu hồ sơ</button><a class="ops-button" href="/LegalDocuments?kind=@Model.Kind&bookingId=@Model.BookingId">Hủy</a></div>
+</form></section>
+<aside class="card"><h2 class="card-title">Quy trình hồ sơ</h2><ol class="ops-help-list"><li>Chọn loại hồ sơ và đối tượng liên quan.</li><li>Nhập nội dung hoặc đính kèm tài liệu.</li><li>Lưu và kiểm tra bản soạn.</li><li>Với hợp đồng Booking, chọn “Chuyển cho Booking” ở trang chi tiết.</li></ol><p class="ops-muted">Hợp đồng đã chuyển được giữ nguyên để đối chiếu. Hợp đồng lao động và nội quy được lưu trong hồ sơ Pháp chế.</p></aside>
+</div>
+@section Scripts {
+<script>
+(() => {
+ const kind = document.getElementById('document-kind');
+ function update() {
+  for (const [id, value] of [['booking-choice', 'booking'], ['employee-choice', 'employment']]) {
+   const field = document.getElementById(id), selected = kind.value === value;
+   field.hidden = !selected; field.querySelector('select').disabled = !selected; field.querySelector('select').required = selected;
+  }
+ }
+ kind.addEventListener('change', update); update();
+})();
+</script>
+}

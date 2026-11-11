@@ -1,0 +1,37 @@
+@using HanaMedia.Constants
+@{
+    var isAccounting = Context.Request.Path.StartsWithSegments("/Accounting");
+    var legal = User.IsInRole(AppRoles.LegalStaff);
+    var path = Context.Request.Path.Value ?? "";
+    var kind = Context.Request.Query["kind"].ToString();
+    string Tab(bool active) => active ? "ops-tab active" : "ops-tab";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>@ViewData["Title"] — HanaMedia</title>
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css"><link rel="stylesheet" href="~/css/layout.css"><link rel="stylesheet" href="~/css/components.css">
+  <link rel="stylesheet" href="~/css/operations.css" asp-append-version="true">
+</head>
+<body><div class="layout"><partial name="_SidebarPartial" />
+<main class="main ops-page">
+  <div class="topbar">
+    <div><h1 class="page-title">@ViewData["Title"]</h1><p class="page-sub">@ViewData["Subtitle"]</p></div>
+    <div class="ops-actions">@if (User.IsInRole(AppRoles.Accountant)) { <span class="ops-badge neutral"><i class="ti ti-eye" aria-hidden="true"></i> Chỉ xem</span> }@await RenderSectionAsync("PageActions", required: false)</div>
+  </div>
+  @if (isAccounting)
+  {
+    <nav class="ops-tabs" aria-label="Nghiệp vụ kế toán"><a class="@Tab(path.Contains("Receivables"))" href="/Accounting/Receivables">Công nợ &amp; hạn thu</a><a class="@Tab(path == "/Accounting")" href="/Accounting">Đối soát tài chính</a><a class="ops-tab" href="/Bookings">Xem Booking</a></nav>
+  }
+  else if (legal)
+  {
+    <nav class="ops-tabs" aria-label="Nghiệp vụ pháp chế"><a class="@Tab(path == "/Legal")" href="/Legal">Giám sát hợp đồng</a><a class="@Tab(path == "/LegalDocuments" && (kind == "booking" || kind == ""))" href="/LegalDocuments?kind=booking">Hợp đồng Booking</a><a class="@Tab(path == "/LegalDocuments" && kind == "employment")" href="/LegalDocuments?kind=employment">Hợp đồng lao động</a><a class="@Tab(path == "/LegalDocuments" && kind == "policy")" href="/LegalDocuments?kind=policy">Nội quy công ty</a></nav>
+  }
+  @if (TempData["SuccessMessage"] is string success) { <div class="ops-notice success" role="status"><i class="ti ti-circle-check" aria-hidden="true"></i> @success</div> }
+  @if (TempData["ErrorMessage"] is string error) { <div class="ops-notice error" role="alert">@error</div> }
+  @RenderBody()
+</main></div>
+@await RenderSectionAsync("Scripts", required: false)
+</body></html>

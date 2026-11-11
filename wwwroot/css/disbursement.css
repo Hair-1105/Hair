@@ -1,0 +1,20 @@
+.disbursement-panel { display:grid; gap:14px; min-width:240px; text-align:left; font-family:Inter,Manrope,sans-serif; font-size:13px; line-height:1.5; }
+.disbursement-item { padding:18px; border:1px solid #e4e9f0; border-radius:12px; background:#f8faff; min-width:0; }
+.disbursement-heading { display:flex; align-items:center; gap:8px; color:#0b3a6e; font-size:14px; }
+.disbursement-heading .ti { color:#287cf3; font-size:20px; }
+.disbursement-total { margin:10px 0 8px; color:#1769e0; font-size:22px; font-weight:700; }
+.disbursement-total span { font-size:14px; font-weight:500; }
+.disbursement-status { display:inline-flex; padding:4px 9px; border-radius:6px; font-size:12px; font-weight:600; }
+.disbursement-status.is-pending { color:#9a5b00; background:#fff4dc; }
+.disbursement-status.is-paid { color:#08794f; background:#e4f7ee; }
+.disbursement-recipients { margin-top:12px; color:#536783; }
+.disbursement-recipients summary { cursor:pointer; color:#1769e0; font-weight:500; padding:4px 0; }
+.disbursement-recipient { margin-top:8px; padding-top:8px; border-top:1px solid #e4e9f0; overflow-wrap:anywhere; }
+.disbursement-form { margin:14px 0 0; }
+.disbursement-panel .disbursement-confirm { display:inline-flex; justify-content:center; align-items:center; gap:7px; width:100%; min-height:40px; padding:10px 14px; border:1px solid #0b3a6e; border-radius:8px; background:#0b3a6e; color:#fff; font-family:inherit; font-size:13px; font-weight:600; line-height:1.45; white-space:normal; cursor:pointer; transition:background .15s ease; }
+.disbursement-panel .disbursement-confirm:hover { background:#164f8e; border-color:#164f8e; }
+.disbursement-confirm:focus-visible, .disbursement-recipients summary:focus-visible { outline:3px solid #86b6ff; outline-offset:3px; }
+.disbursement-note { grid-column:1/-1; color:#7a8ca6; font-size:12px; }
+.disbursement-detail .disbursement-panel { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.disbursement-detail h3 { margin:0 0 18px; }
+@media(max-width:640px) { .disbursement-detail .disbursement-panel { grid-template-columns:1fr; min-width:0; } .disbursement-item { padding:14px; } }

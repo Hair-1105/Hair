@@ -1,0 +1,100 @@
+@model HanaMedia.ViewModels.CompanyDashboardViewModel
+@using System.Globalization
+@using HanaMedia.Constants
+@{
+    var basePath = ViewData["DashboardPath"] as string ?? "/Director/Dashboard";
+    var queryName = ViewData["PeriodQueryName"] as string ?? "period";
+    var readOnly = ViewData["ReadOnly"] as bool? ?? false;
+    var showDirectorMetrics = User.IsInRole(AppRoles.Director);
+    var maxDepartmentCount = Math.Max(1, Model.Departments.Select(item => item.EmployeeCount).DefaultIfEmpty(0).Max());
+    string Money(decimal value) => value switch
+    {
+        >= 1_000_000_000m => $"{value / 1_000_000_000m:0.##} tỷ đ",
+        >= 1_000_000m => $"{value / 1_000_000m:0.##} triệu đ",
+        _ => $"{value:N0} đ"
+    };
+}
+
+<section class="company-dashboard" aria-label="Dashboard tổng công ty">
+  <div class="card dashboard-filter-card">
+    <div><div class="card-title">Tổng quan toàn công ty</div><div class="card-sub">Dữ liệu database · @Model.PeriodLabel · cập nhật @Model.GeneratedAt.ToString("HH:mm dd/MM/yyyy")</div></div>
+    <div class="period-tabs" aria-label="Chọn kỳ báo cáo">
+      <a class="period-tab @(Model.Period == "day" ? "active" : null)" href="@basePath?@queryName=day">Ngày</a>
+      <a class="period-tab @(Model.Period == "month" ? "active" : null)" href="@basePath?@queryName=month">Tháng</a>
+      <a class="period-tab @(Model.Period == "quarter" ? "active" : null)" href="@basePath?@queryName=quarter">Quý</a>
+    </div>
+    @if (readOnly) { <span class="dashboard-readonly"><i class="ti ti-eye"></i> Chỉ xem</span> }
+  </div>
+
+  <div class="kpi-grid company-kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Tổng nhân sự hiện tại</div><div class="kpi-value">@Model.TotalEmployees</div><div class="kpi-note">Đang làm việc, thử việc hoặc chờ duyệt nghỉ</div></div>
+    <div class="kpi-card"><div class="kpi-label">@(showDirectorMetrics ? "Tổng số Booking" : "Số Booking")</div><div class="kpi-value">@Model.BookingCount</div><div class="kpi-note">@Model.RunningBookings Booking đang chạy@(showDirectorMetrics ? " · Toàn bộ thời gian, gồm cả đã hủy" : "")</div></div>
+    <div class="kpi-card"><div class="kpi-label">Doanh thu thực thu</div><div class="kpi-value money-value">@Money(Model.BookingRevenue)</div><div class="kpi-note">Chỉ Booking đã nghiệm thu, theo ngày nhận tiền khách</div></div>
+    <div class="kpi-card"><div class="kpi-label">Booking đang chạy</div><div class="kpi-value">@Model.RunningCampaigns</div><div class="kpi-note">Trạng thái hiện tại</div></div>
+    <div class="kpi-card"><div class="kpi-label">Ý tưởng chờ duyệt</div><div class="kpi-value">@Model.PendingIdeas</div><div class="kpi-note">Đang ở bước review quản lý</div></div>
+    <div class="kpi-card"><div class="kpi-label">Công việc quá hạn</div><div class="kpi-value @(Model.OverdueTasks > 0 ? "metric-danger" : null)">@Model.OverdueTasks</div><div class="kpi-note">Chưa hoàn thành, đã quá deadline</div></div>
+    <div class="kpi-card"><div class="kpi-label">@(showDirectorMetrics ? "Lợi nhuận công ty" : "Lợi nhuận booking")</div><div class="kpi-value money-value">@Money(Model.BookingProfit)</div><div class="kpi-note">Biên lợi nhuận @Model.ProfitMargin%</div></div>
+    @if (showDirectorMetrics)
+    {
+      <div class="kpi-card" data-metric="booking-remuneration" data-value="@Model.BookingRemuneration.ToString(CultureInfo.InvariantCulture)"><div class="kpi-label">Hoa hồng Booking</div><div class="kpi-value money-value">@Money(Model.BookingRemuneration)</div><div class="kpi-note">Hoa hồng của Booking đã nghiệm thu trong kỳ nhận tiền khách.</div></div>
+      <div class="kpi-card" data-metric="kol-remuneration" data-value="@Model.KolRemuneration.ToString(CultureInfo.InvariantCulture)"><div class="kpi-label">Thù lao KOL/KOC</div><div class="kpi-value money-value">@Money(Model.KolRemuneration)</div><div class="kpi-note">Quỹ cast trong kỳ, theo tỷ lệ đã lưu. Không tính Booking đã hủy.</div></div>
+      <div class="kpi-card" data-metric="outstanding-amount" data-value="@Model.OutstandingAmount.ToString(CultureInfo.InvariantCulture)"><div class="kpi-label">Công nợ</div><div class="kpi-value money-value">@Model.OutstandingAmount.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) đ</div><div class="kpi-note">Tổng tiền chưa thu của @Model.OutstandingCampaignCount Booking, gồm cả kỳ trước; không tính đã hủy.</div></div>
+    }
+  </div>
+
+  @if (showDirectorMetrics)
+  {
+    <section class="card" aria-label="Công nợ Booking" id="outstandingCampaigns">
+      <div class="card-head"><div><div class="card-title">Công nợ — Booking chưa thu tiền khách (@Model.OutstandingCampaignCount)</div><div class="card-sub">Booking chưa nghiệm thu, gồm cả đang chờ, đã duyệt, đang chạy và hoàn thành. Khi người phụ trách xác nhận nhận tiền khách, Booking tự rời danh sách này.</div></div></div>
+      <p class="kpi-note">Tổng giá trị chưa thu: @Money(Model.OutstandingAmount). Khi xác nhận nhận đủ tiền, toàn bộ giá trị Booking được trừ khỏi công nợ và ghi nhận vào kỳ nhận tiền.</p>
+      @if (Model.LegacyRemunerationExcludedCount > 0) { <p class="kpi-note">Có @Model.LegacyRemunerationExcludedCount Booking lịch sử trong kỳ chưa có tỷ lệ hoa hồng/cast đã lưu, không được cộng vào hai tổng thù lao.</p> }
+      <div class="table-scroll"><table><thead><tr><th>ID</th><th>Booking</th><th>Khách hàng</th><th>QL phụ trách</th><th>Trạng thái</th><th></th></tr></thead><tbody>
+      @if (Model.OutstandingCampaigns.Count == 0) { <tr><td colspan="6" class="dashboard-empty">Không có Booking chưa thu tiền khách.</td></tr> }
+      else { @foreach (var c in Model.OutstandingCampaigns) { <tr><td>#@c.Id</td><td>@c.Name</td><td>@c.Client</td><td>@c.ManagerName</td><td>@c.StatusLabel</td><td><a class="btn-mini" href="/Bookings/Details/@c.Id">Chi tiết</a></td></tr> } }
+      </tbody></table></div>
+      <p class="kpi-note">Hiển thị @Model.OutstandingCampaigns.Count / @Model.OutstandingCampaignCount Booking · <a href="/Bookings">Xem danh sách đầy đủ</a></p>
+    </section>
+  }
+
+  <div class="grid-2 company-dashboard-grid">
+    <div class="card">
+      <div class="card-head"><div><div class="card-title">Nhân sự theo phòng ban</div><div class="card-sub">Tổng @Model.TotalEmployees nhân sự hiện tại</div></div></div>
+      @if (Model.Departments.Count == 0) { <div class="dashboard-empty">Chưa có dữ liệu nhân sự.</div> }
+      else
+      {
+        @foreach (var department in Model.Departments)
+        {
+          var barWidth = Math.Round(department.EmployeeCount * 100m / maxDepartmentCount, 1);
+          <div class="dept-row"><div class="dept-name">@department.Name</div><div class="dept-bar-track"><div class="dept-bar-fill" style="width:@barWidth.ToString(CultureInfo.InvariantCulture)%"></div></div><div class="dept-count">@department.EmployeeCount <small>(@department.Percentage%)</small></div></div>
+        }
+      }
+    </div>
+    <div class="card">
+      <div class="card-head"><div><div class="card-title">Hiệu suất phòng ban</div><div class="card-sub">Tỷ lệ task hoàn thành theo deadline trong kỳ</div></div></div>
+      <div class="table-scroll"><table><thead><tr><th>Phòng ban</th><th>Hoàn thành</th><th>Hiệu suất</th></tr></thead><tbody>
+      @if (Model.DepartmentPerformance.Count == 0) { <tr><td colspan="3" class="dashboard-empty">Chưa có task trong kỳ.</td></tr> }
+      else { @foreach (var performance in Model.DepartmentPerformance) { <tr><td><strong>@performance.Name</strong></td><td>@performance.CompletedTasks/@performance.TotalTasks</td><td><span class="performance-bar"><span style="width:@performance.CompletionRate.ToString(CultureInfo.InvariantCulture)%"></span></span><strong>@performance.CompletionRate%</strong></td></tr> } }
+      </tbody></table></div>
+    </div>
+  </div>
+
+  <div class="grid-2 company-dashboard-grid">
+    <div class="card">
+      <div class="card-head"><div><div class="card-title">Booking theo trạng thái</div><div class="card-sub">Phát sinh trong @Model.PeriodLabel.ToLowerInvariant()</div></div></div>
+      <div class="booking-status-grid">@foreach (var status in Model.BookingStatuses) { <div class="booking-status-item"><span>@status.Label</span><strong>@status.Count</strong></div> }</div>
+      <div class="financial-summary"><div><span>Doanh thu</span><strong>@Money(Model.BookingRevenue)</strong></div><div><span>Chi phí</span><strong>@Money(Model.BookingCost)</strong></div><div><span>Lợi nhuận</span><strong class="metric-success">@Money(Model.BookingProfit)</strong></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><div class="card-title">Doanh thu theo kỳ</div><div class="card-sub">Doanh thu, chi phí và lợi nhuận booking</div></div></div>
+      <div class="revenue-table" role="table" aria-label="Doanh thu thực thu theo kỳ">
+      @foreach (var point in Model.RevenueSeries) { <div class="revenue-row" role="row"><strong>@point.Label</strong><span title="Doanh thu">@Money(point.Revenue)</span><span title="Chi phí">@Money(point.Cost)</span><span class="metric-success" title="Lợi nhuận">@Money(point.Profit)</span></div> }
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<style>
+  .company-dashboard{display:grid;gap:20px}.dashboard-filter-card{display:flex;align-items:center;gap:18px;justify-content:space-between;padding:18px 22px}.dashboard-filter-card .period-tabs{margin-left:auto}.dashboard-filter-card .period-tab{text-decoration:none}.dashboard-readonly{color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 12px;white-space:nowrap}.company-kpi-grid,.company-dashboard-grid{margin:0}.money-value{font-size:25px}.metric-danger{color:var(--red)!important}.metric-success{color:var(--green)!important}.dashboard-empty{text-align:center;color:var(--muted);padding:24px!important}.dept-count{min-width:92px;text-align:right}.dept-count small{color:var(--muted)}.table-scroll{overflow-x:auto}.performance-bar{display:inline-block;vertical-align:middle;width:90px;height:7px;background:var(--blue-100);border-radius:9px;margin-right:8px;overflow:hidden}.performance-bar span{display:block;height:100%;background:var(--green);border-radius:9px}.booking-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.booking-status-item{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px}.booking-status-item span{color:var(--muted)}.financial-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;border-top:1px solid var(--border);margin-top:16px;padding-top:16px}.financial-summary div{display:grid;gap:6px}.financial-summary span{color:var(--muted);font-size:12px}.revenue-table{display:grid;gap:10px}.revenue-row{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr));gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}.revenue-row:last-child{border-bottom:0}.revenue-row span{text-align:right}.change-chip{display:inline-block;border-radius:999px;padding:4px 9px;background:var(--green-bg);color:var(--green);font-weight:600;font-size:12px}.change-chip.departed{background:var(--red-bg);color:var(--red)}
+  @@media(max-width:900px){.dashboard-filter-card{align-items:flex-start;flex-wrap:wrap}.dashboard-filter-card .period-tabs{order:3;width:100%;margin-left:0}.booking-status-grid,.financial-summary{grid-template-columns:1fr 1fr}.revenue-row{grid-template-columns:60px repeat(3,minmax(110px,1fr));min-width:480px}}
+</style>

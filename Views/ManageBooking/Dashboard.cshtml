@@ -1,0 +1,253 @@
+@using HanaMedia.ViewModels
+@using System.Globalization
+@{
+    var personalCommission = ViewBag.PersonalCommission as PersonalBookingCommissionViewModel;
+    var moneyCulture = CultureInfo.GetCultureInfo("vi-VN");
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Dashboard Quản lý Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+</head>
+<body>
+<div class="layout">
+
+  <partial name="_SidebarPartial" />
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Dashboard Booking</div>
+        <div class="page-sub">Chi tiết Booking quảng cáo, doanh số phòng ban và năng suất hoàn thành của nhân sự Booking</div>
+      </div>
+      <div class="topbar-actions">
+        <div class="period-tabs">
+          <div class="period-tab">Ngày</div>
+          <div class="period-tab active">Tháng</div>
+          <div class="period-tab">Quý</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI GRID (5 CARD / ROW ON DESKTOP) -->
+    @if (personalCommission != null)
+    {
+      <section class="card" style="margin-bottom:24px;" aria-label="Hoa hồng Booking của tôi">
+        <div class="card-head"><div class="card-title">Hoa hồng Booking của tôi — toàn thời gian</div></div>
+        @if (!personalCommission.HasEmployeeProfile)
+        {
+          <p>Tài khoản chưa liên kết hồ sơ nhân sự. Liên hệ Admin IT/HCNS để xem hoa hồng cá nhân.</p>
+        }
+        else
+        {
+          <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));">
+            <div class="kpi-card">
+              <div class="kpi-label">Tổng hoa hồng được ghi nhận</div>
+              <div class="kpi-value" style="font-size:clamp(20px,2vw,28px);overflow-wrap:anywhere;">@personalCommission.Total.ToString("N0", moneyCulture) đ</div>
+              <div class="kpi-note">@personalCommission.CustomerPaidCount Booking đã thu tiền khách — Booking đã nhận tiền khách</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Công ty đã thanh toán</div>
+              <div class="kpi-value" style="font-size:clamp(20px,2vw,28px);overflow-wrap:anywhere;">@personalCommission.CompanyPaid.ToString("N0", moneyCulture) đ</div>
+              <div class="kpi-note">Hoa hồng đã được kế toán xác nhận trả cho tôi</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Công ty chưa thanh toán</div>
+              <div class="kpi-value" style="font-size:clamp(20px,2vw,28px);overflow-wrap:anywhere;">@personalCommission.CompanyUnpaid.ToString("N0", moneyCulture) đ</div>
+              <div class="kpi-note">Khách đã thanh toán, còn chờ công ty trả hoa hồng</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Dự kiến — chờ khách thanh toán</div>
+              <div class="kpi-value" style="font-size:clamp(20px,2vw,28px);overflow-wrap:anywhere;">@personalCommission.PendingCustomerPayment.ToString("N0", moneyCulture) đ</div>
+              <div class="kpi-note">Chưa cộng vào tổng hoa hồng được ghi nhận</div>
+            </div>
+          </div>
+          <p class="kpi-note">Chỉ ghi nhận khi Booking đã nhận tiền khách (xác nhận đã nhận tiền khách). Không tính Booking đã hủy. Tiền công ty trả dựa trên đối soát kế toán, không dựa vào trạng thái ký hợp đồng. Số liệu cập nhật khi tải lại dashboard.</p>
+          @if (personalCommission.LegacyBookingCount > 0)
+          {
+            <p class="kpi-note">@personalCommission.LegacyBookingCount Booking theo cơ chế thù lao cũ không cộng vào tổng này.</p>
+          }
+        }
+      </section>
+    }
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Booking đang chờ</div>
+          <div class="kpi-icon" style="background:var(--blue-100); color:var(--blue-700);"><i class="ti ti-clock"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.PendingCount</div>
+        <div class="kpi-note">Chờ deal và chốt thông tin</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Giám đốc duyệt</div>
+          <div class="kpi-icon" style="background:var(--amber-bg); color:var(--amber);"><i class="ti ti-message-dots"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.NegotiatingCount</div>
+        <div class="kpi-note">Đang liên hệ thương lượng giá</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Booking đã chốt</div>
+          <div class="kpi-icon" style="background:var(--green-bg); color:var(--green);"><i class="ti ti-circle-check"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.ClosedCount</div>
+        <div class="kpi-note">Đã ký kết hợp đồng</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Đang chạy</div>
+          <div class="kpi-icon" style="background:var(--blue-100); color:var(--blue-700);"><i class="ti ti-player-play"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.RunningCount</div>
+        <div class="kpi-note">KOL đang sản xuất/chờ đăng bài</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Booking hoàn thành</div>
+          <div class="kpi-icon" style="background:var(--green-bg); color:var(--green);"><i class="ti ti-checkbox"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.CompletedCount</div>
+        <div class="kpi-note">Đã nghiệm thu bài đăng</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Booking hủy</div>
+          <div class="kpi-icon" style="background:var(--red-bg); color:var(--red);"><i class="ti ti-circle-x"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.CancelledCount</div>
+        <div class="kpi-note">Hủy do KOL hoặc Client đổi kế hoạch</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Doanh thu thực thu</div>
+          <div class="kpi-icon" style="background:var(--green-bg); color:var(--green);"><i class="ti ti-cash"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.RevenueText</div>
+        <div class="kpi-delta up"><i class="ti ti-arrow-up-right"></i>Doanh số thực tế</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Chi phí Booking</div>
+          <div class="kpi-icon" style="background:var(--blue-100); color:var(--blue-700);"><i class="ti ti-receipt"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.CostText</div>
+        <div class="kpi-note">Bao gồm phí deal KOL &amp; dịch vụ</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Lợi nhuận Booking</div>
+          <div class="kpi-icon" style="background:var(--green-bg); color:var(--green);"><i class="ti ti-chart-line"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.ProfitText</div>
+        <div class="kpi-note">@ViewBag.ProfitMarginText</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div class="kpi-label">Công việc quá hạn</div>
+          <div class="kpi-icon" style="background:var(--red-bg); color:var(--red);"><i class="ti ti-alert-triangle"></i></div>
+        </div>
+        <div class="kpi-value">@ViewBag.OverdueCount</div>
+        <div class="kpi-delta down"><i class="ti ti-arrow-down-right"></i>Cần đôn đốc nhân sự</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Hiệu suất làm việc &amp; KPI nhân viên Booking</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Nhân viên</th>
+              <th>Số lượng Booking</th>
+              <th>Hoàn thành đúng hạn</th>
+              <th>Hiệu suất KPI (T8)</th>
+              <th>Đánh giá</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (ViewBag.ManagerStats == null || !((IEnumerable<dynamic>)ViewBag.ManagerStats).Any())
+            {
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--muted-text); font-style: italic; padding: 20px 0;">
+                  Chưa có dữ liệu thống kê hiệu suất.
+                </td>
+              </tr>
+            }
+            else
+            {
+              foreach (var stat in ViewBag.ManagerStats)
+              {
+                <tr>
+                  <td><strong>@stat.ManagerName</strong></td>
+                  <td>@stat.TotalCount booking</td>
+                  <td>@stat.CompletedCount/@stat.TotalCount</td>
+                  <td><span class="bar-mini"><span class="bar-mini-fill" style="width:@stat.Kpi%"></span></span>@stat.Kpi%</td>
+                  <td><span class="status-chip @stat.RatingClass">@stat.Rating</span></td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Trạng thái phân bổ thù lao Booking</div>
+        </div>
+        <div style="position:relative; height:200px; margin-bottom:12px;">
+          <canvas id="bookingStatusChart"></canvas>
+        </div>
+        <div class="legend" style="justify-content:space-between; gap:10px 16px; font-size:12px;">
+          <span><i style="background:#8AB8F2"></i>Chờ (@ViewBag.PendingCount)</span>
+          <span><i style="background:#2F80ED"></i>Đã nghiệm thu (@ViewBag.ClosedCount)</span>
+          <span><i style="background:#1CA36B"></i>Hoàn thành (@ViewBag.CompletedCount)</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const bookingCtx = document.getElementById('bookingStatusChart');
+new Chart(bookingCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Đang chờ','Đã nghiệm thu','Hoàn thành'],
+    datasets: [{
+      data: [@ViewBag.PendingCount, @ViewBag.ClosedCount, @ViewBag.CompletedCount],
+      backgroundColor: ['#8AB8F2','#2F80ED','#1CA36B'],
+      borderColor:'#fff', borderWidth:2
+    }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false, cutout:'68%',
+    plugins:{ legend:{ display:false } }
+  }
+});
+</script>
+</body>
+</html>

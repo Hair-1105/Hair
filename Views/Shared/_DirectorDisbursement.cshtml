@@ -1,0 +1,45 @@
+@model HanaMedia.Models.Booking
+@using HanaMedia.Controllers
+@using HanaMedia.Constants
+@using System.Globalization
+@if ((User.IsInRole(AppRoles.Director) || User.IsInRole(AppRoles.Accountant)) && Model.WorkflowStatus == "da_nghiem_thu" && Model.FinanceVersion == 1)
+{
+    var all = BookingPayables.For(Model);
+    <div class="disbursement-panel">
+    @foreach (var group in new[] { "kol", "booking" })
+    {
+        var label = group == "kol" ? "Thù lao KOL/KOC" : "Hoa hồng booking";
+        var rows = all.Where(p => group == "kol" ? p.Kind == "cast" : p.Kind is "staff" or "manager").Where(p => p.Amount > 0).ToList();
+        var paid = rows.Count > 0 && rows.All(p => p.Paid);
+        <div class="disbursement-item">
+            <div class="disbursement-heading"><i class="ti @(group == "kol" ? "ti-user-star" : "ti-cash")" aria-hidden="true"></i><strong>@label</strong></div>
+            <div class="disbursement-total">@rows.Sum(p => p.Amount).ToString("N0") <span>đ</span></div>
+            <span class="disbursement-status @(paid ? "is-paid" : "is-pending")">@(rows.Count == 0 ? "Không phát sinh" : paid ? "Đã chi trả" : rows.Any(p => p.Paid) ? "Đã chi một phần" : "Chưa chi trả")</span>
+            <details class="disbursement-recipients">
+                <summary>Xem người nhận</summary>
+                @foreach (var row in rows)
+                {
+                    var payment = Model.Payments.SingleOrDefault(p => p.Kind == row.Kind && p.PayeeId == row.PayeeId && p.IsPaid);
+                    <div class="disbursement-recipient">@row.Name: @row.Amount.ToString("N0") đ — @(row.Paid ? "Đã trả" : "Chưa trả")
+                    @if (row.Paid && payment != null) { <span>(@payment.UpdatedAt.ToString("dd/MM/yyyy HH:mm"), TK #@payment.UpdatedByUserId)</span> }
+                    </div>
+                }
+            </details>
+            @if (User.IsInRole(AppRoles.Director) && rows.Count > 0 && !paid)
+            {
+                <form method="post" action="/Accounting/ConfirmDisbursement/@Model.Id" onsubmit="return confirm('Chỉ xác nhận khi đã thực trả đủ cho tất cả người nhận trong nhóm này. Tiếp tục?');" class="disbursement-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="group" value="@group" />
+                    <input type="hidden" name="expectedAmount" value="@rows.Sum(p => p.Amount).ToString(CultureInfo.InvariantCulture)" />
+                    <button type="submit" class="btn-primary-blue disbursement-confirm"><i class="ti ti-check" aria-hidden="true"></i><span>Xác nhận đã trả @(group == "kol" ? "KOL/KOC" : "hoa hồng booking")</span></button>
+                </form>
+            }
+        </div>
+    }
+    <div class="disbursement-note"><i class="ti ti-info-circle" aria-hidden="true"></i> Ghi nhận khoản đã trả, không chuyển tiền.</div>
+    </div>
+}
+else
+{
+    <span style="color:var(--muted);">@(Model.FinanceVersion != 1 ? "Dữ liệu lịch sử" : "Chỉ xác nhận sau nghiệm thu")</span>
+}

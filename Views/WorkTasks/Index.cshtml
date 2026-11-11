@@ -1,0 +1,507 @@
+@model HanaMedia.ViewModels.WorkTaskPageViewModel
+@using HanaMedia.Constants
+@using System.Security.Claims
+@{
+    Layout = null;
+    var role = User.FindFirstValue(ClaimTypes.Role) ?? "";
+    var tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+    var isManager = role is AppRoles.Director or AppRoles.HumanResourcesManager or AppRoles.BookingManager or AppRoles.IdeaManager;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Phân công &amp; Duyệt công việc</title>
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+  <style>
+    :root {
+      --primary-blue: #0B3A6E;
+      --secondary-blue: #2563EB;
+      --light-blue: #EFF6FF;
+      --bg-color: #F5F8FC;
+      --white: #FFFFFF;
+      --text-color: #17324D;
+      --muted-text: #64748B;
+      --success-color: #16A34A;
+      --warning-color: #D97706;
+      --danger-color: #DC2626;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(11, 58, 110, 0.05);
+      border: 1px solid rgba(11, 58, 110, 0.08);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .task-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .form-control-filter {
+      padding: 8px 12px;
+      border: 1px solid #d9e2ef;
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text-color);
+      background-color: var(--white);
+    }
+
+    .btn-primary-blue {
+      background: var(--primary-blue);
+      color: var(--white);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .btn-primary-blue:hover {
+      background: #092e59;
+    }
+
+    .module-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .module-tab {
+      padding: 10px 18px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      color: var(--text-color);
+      text-decoration: none;
+      font-weight: 550;
+      background: var(--white);
+      transition: all 0.2s;
+    }
+    .module-tab.active {
+      background: var(--primary-blue);
+      color: var(--white);
+      border-color: var(--primary-blue);
+    }
+
+    .message {
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    .message.success {
+      background: #eafaf1;
+      color: var(--success-color);
+      border: 1px solid rgba(22, 163, 74, 0.2);
+    }
+    .message.error {
+      background: #fef2f2;
+      color: var(--danger-color);
+      border: 1px solid rgba(220, 38, 38, 0.2);
+    }
+
+    .status-chip {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .status-todo { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .status-in_progress { background: #eff6ff; color: var(--secondary-blue); border: 1px solid #bfdbfe; }
+    .status-review { background: #fffbeb; color: var(--warning-color); border: 1px solid #fef3c7; }
+    .status-need_revision { background: #fff5f5; color: var(--danger-color); border: 1px solid #fed7d7; }
+    .status-approved { background: #f0fdf4; color: var(--success-color); border: 1px solid #bbf7d0; }
+    .status-done { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+    .deadline.overdue {
+      color: var(--danger-color);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th {
+      background-color: var(--light-blue);
+      color: var(--primary-blue);
+      text-align: left;
+      padding: 14px 16px;
+      font-weight: 600;
+      border-bottom: 2px solid rgba(11, 58, 110, 0.1);
+    }
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    tr:hover td {
+      background-color: var(--light-blue);
+    }
+
+    .btn-workspace {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .btn-workspace.todo {
+      background: var(--light-blue);
+      color: var(--secondary-blue);
+      border-color: #bfdbfe;
+    }
+    .btn-workspace.todo:hover {
+      background: #dbeafe;
+    }
+    .btn-workspace.in_progress {
+      background: var(--secondary-blue);
+      color: var(--white);
+    }
+    .btn-workspace.in_progress:hover {
+      background: #1d4ed8;
+    }
+    .btn-workspace.review {
+      background: #fffbeb;
+      color: var(--warning-color);
+      border-color: #fde68a;
+    }
+    .btn-workspace.review:hover {
+      background: #fef3c7;
+    }
+    .btn-workspace.need_revision {
+      background: #fff5f5;
+      color: var(--danger-color);
+      border-color: #fecaca;
+    }
+    .btn-workspace.need_revision:hover {
+      background: #fee2e2;
+    }
+    .btn-workspace.approved {
+      background: #f0fdf4;
+      color: var(--success-color);
+      border-color: #bbf7d0;
+    }
+    .btn-workspace.done {
+      background: #f8fafc;
+      color: #64748b;
+      border-color: #e2e8f0;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 48px;
+      color: var(--muted-text);
+      font-style: italic;
+    }
+
+    .modal-card {
+      max-width: 650px;
+      border-radius: 16px;
+      border: 1px solid rgba(11, 58, 110, 0.15);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <partial name="_WorkTaskSidebarPartial" model="Model" />
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Phân công &amp; Duyệt công việc</div>
+        <div class="page-sub">Theo dõi task từ Cần làm → Đang thực hiện → Chờ duyệt → Đã duyệt → Hoàn thành</div>
+      </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] is string success) { <div class="message success">@success</div> }
+    @if (TempData["ErrorMessage"] is string error) { <div class="message error">@error</div> }
+    @if (Model.CanCreate && Model.ActiveEmployeesWithoutAccount > 0)
+    {
+      <div class="message error">Có @Model.ActiveEmployeesWithoutAccount nhân sự @Model.ModuleLabel đang hoạt động nhưng chưa được liên kết tài khoản. AdminIT cần cấp/liên kết tài khoản trước khi nhân sự có thể nhận và cập nhật task.</div>
+    }
+
+    @if (Model.AvailableModules.Count > 1)
+    {
+      <div class="module-tabs">
+        @foreach (var item in Model.AvailableModules)
+        { 
+          <a class="module-tab @(item.Code == Model.Module ? "active" : "")" href="/Tasks?module=@item.Code">@item.Label</a> 
+        }
+      </div>
+    }
+
+    <div class="card">
+      <form method="get" action="/Tasks" class="task-toolbar">
+        <input type="hidden" name="module" value="@Model.Module">
+
+        <div class="filter-group">
+          <input name="search" value="@Model.Search" class="form-control-filter" style="width:220px" placeholder="Tìm công việc, nhân sự...">
+          
+          <select name="status" class="form-control-filter" onchange="this.form.submit()">
+            <option value="">-- Trạng thái --</option>
+            <option value="todo" selected="@(Model.SelectedStatus == "todo")">Cần làm</option>
+            <option value="in_progress" selected="@(Model.SelectedStatus == "in_progress")">Đang thực hiện</option>
+            <option value="review" selected="@(Model.SelectedStatus == "review")">Chờ duyệt</option>
+            <option value="need_revision" selected="@(Model.SelectedStatus == "need_revision")">Cần chỉnh sửa</option>
+            <option value="approved" selected="@(Model.SelectedStatus == "approved")">Đã duyệt</option>
+            <option value="done" selected="@(Model.SelectedStatus == "done")">Hoàn thành</option>
+          </select>
+
+          <select name="reviewerId" class="form-control-filter" onchange="this.form.submit()">
+            <option value="">-- Người duyệt --</option>
+            @foreach (var rev in Model.Reviewers)
+            {
+              <option value="@rev.Id" selected="@(Model.SelectedReviewerId == rev.Id)">@rev.FullName</option>
+            }
+          </select>
+
+          <select name="overdue" class="form-control-filter" onchange="this.form.submit()">
+            <option value="">-- Hạn chót --</option>
+            <option value="true" selected="@(Model.SelectedOverdue == true)">Quá hạn</option>
+            <option value="false" selected="@(Model.SelectedOverdue == false)">Trong hạn</option>
+          </select>
+
+          <button class="btn-primary-blue" type="submit"><i class="ti ti-filter"></i> Lọc</button>
+        </div>
+
+        @if (Model.CanCreate) 
+        { 
+          <button class="btn-primary-blue" style="background-color: var(--success-color);" type="button" onclick="openModal('createTaskModal')"><i class="ti ti-plus"></i> Giao việc mới</button> 
+        }
+      </form>
+
+      <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Công việc</th>
+            <th>Nhân sự</th>
+            <th>Deadline</th>
+            <th>Người duyệt</th>
+            <th>Liên kết</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+        @if (Model.Tasks.Count == 0)
+        { 
+          <tr><td colspan="7" class="empty">Chưa có công việc nào khớp với bộ lọc trong phân hệ @Model.ModuleLabel.</td></tr> 
+        }
+        @foreach (var task in Model.Tasks)
+        {
+          <tr>
+            <td class="task-title">
+              <strong>@task.Title</strong>
+              <div style="font-size:13px; color: var(--muted-text); margin-top:2px;">@task.Description</div>
+              <small style="display:block; margin-top:4px;">Tạo bởi @task.CreatorName · @task.ModuleLabel</small>
+            </td>
+            <td>@task.EmployeeName</td>
+            <td class="deadline @(task.Deadline.Date < DateTime.Today && task.Status != WorkTaskStatuses.Done ? "overdue" : "")">
+              @task.Deadline.ToString("dd/MM/yyyy")
+              @if (task.Deadline.Date < DateTime.Today && task.Status != WorkTaskStatuses.Done)
+              {
+                <span style="display:block; font-size:11px; font-weight:bold; color:var(--danger-color);">QUÁ HẠN</span>
+              }
+            </td>
+            <td>@task.ReviewerName</td>
+            <td>@(task.RelatedLabel ?? "—")</td>
+            <td><span class="status-chip status-@task.Status">@task.StatusLabel</span></td>
+            <td>
+              @if (task.Status == "todo")
+              {
+                <a href="/Tasks/Workspace/@task.Id" class="btn-workspace todo"><i class="ti ti-player-play"></i> Bắt đầu làm</a>
+              }
+              else if (task.Status == "in_progress")
+              {
+                <a href="/Tasks/Workspace/@task.Id" class="btn-workspace in_progress"><i class="ti ti-edit"></i> Tiếp tục làm</a>
+              }
+              else if (task.Status == "review")
+              {
+                <a href="/Tasks/Workspace/@task.Id" class="btn-workspace review"><i class="ti ti-hourglass"></i> Đang chờ review</a>
+              }
+              else if (task.Status == "need_revision")
+              {
+                <a href="/Tasks/Workspace/@task.Id" class="btn-workspace need_revision"><i class="ti ti-refresh"></i> Tiếp tục làm</a>
+              }
+              else if (task.Status == "approved")
+              {
+                <a href="/Tasks/Workspace/@task.Id" class="btn-workspace approved"><i class="ti ti-circle-check"></i> Xem kết quả</a>
+              }
+              else
+              {
+                <a href="/Tasks/Workspace/@task.Id" class="btn-workspace done"><i class="ti ti-eye"></i> Xem chi tiết</a>
+              }
+            </td>
+          </tr>
+        }
+        </tbody>
+      </table>
+      </div>
+      @if (Model.TotalPages > 1)
+      { 
+        <div class="pagination">
+          @for (var p = 1; p <= Model.TotalPages; p++) 
+          { 
+            <a class="@(p == Model.Page ? "active" : "")" href="/Tasks?module=@Model.Module&search=@Uri.EscapeDataString(Model.Search ?? "")&status=@(Model.SelectedStatus ?? "")&reviewerId=@(Model.SelectedReviewerId?.ToString() ?? "")&overdue=@(Model.SelectedOverdue?.ToString() ?? "")&page=@p">@p</a> 
+          }
+        </div> 
+      }
+    </div>
+  </main>
+</div>
+
+@if (Model.CanCreate)
+{
+<div class="modal-backdrop" id="createTaskModal">
+  <div class="modal-card">
+    <form method="post" action="/Tasks/Create">
+      @Html.AntiForgeryToken()
+      <div class="modal-header">
+        <div class="modal-title">Giao công việc mới</div>
+        <button type="button" class="modal-close" onclick="closeModal('createTaskModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Phân hệ</label>
+          <select class="form-control" name="Module" id="taskModule" onchange="filterEmployees()">
+            @foreach (var item in Model.AvailableModules) 
+            { 
+              if (item.Code == Model.Module) 
+              { 
+                <option value="@item.Code" selected>@item.Label</option> 
+              } 
+              else 
+              { 
+                <option value="@item.Code">@item.Label</option> 
+              } 
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nhân sự thực hiện</label>
+          <select class="form-control" name="AssignedEmployeeId" id="taskEmployee" required>
+            <option value="">-- Chọn nhân sự thật --</option>
+            @foreach (var employee in Model.Employees) 
+            { 
+              if (employee.Id == Model.SelectedEmployeeId) 
+              { 
+                <option value="@employee.Id" data-department="@employee.Department" selected>@employee.Name</option> 
+              } 
+              else 
+              { 
+                <option value="@employee.Id" data-department="@employee.Department">@employee.Name</option> 
+              } 
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tiêu đề công việc</label>
+          <input class="form-control" name="Title" minlength="3" maxlength="200" required>
+        </div>
+        <div class="form-group">
+          <label>Yêu cầu chi tiết</label>
+          <textarea class="form-control" name="Description" rows="4" maxlength="2000"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Deadline</label>
+          <input type="date" class="form-control" name="Deadline" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@tomorrow" required>
+        </div>
+        
+        <div class="form-group">
+          <label>Người duyệt công việc</label>
+          <select class="form-control" name="ReviewerUserId" required>
+            <option value="">-- Chọn người có quyền duyệt --</option>
+            @foreach (var rev in Model.Reviewers)
+            {
+              <option value="@rev.Id">@rev.FullName (@rev.Role)</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Liên kết nghiệp vụ (tuỳ chọn)</label>
+          <select class="form-control" name="RelatedType" id="taskRelatedType" onchange="toggleRelatedId()">
+            <option value="">-- Không liên kết --</option>
+            <option value="Employee" selected="@(ViewBag.InitialRelatedType == "Employee")">Nhân sự (Hồ sơ)</option>
+            <option value="Booking" selected="@(ViewBag.InitialRelatedType == "Booking")">Booking</option>
+            <option value="Idea" selected="@(ViewBag.InitialRelatedType == "Idea")">Ý tưởng</option>
+          </select>
+        </div>
+        <div class="form-group" id="relatedIdGroup" style="display:none">
+          <label>Mã đối tượng liên kết (ID)</label>
+          <input type="number" class="form-control" name="RelatedId" min="1" value="@ViewBag.InitialRelatedId" placeholder="VD: 123">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-mini" onclick="closeModal('createTaskModal')">Hủy</button>
+        <button type="submit" class="btn-mini approve">Giao việc</button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<script>
+function openModal(id){document.getElementById(id)?.classList.add('active');filterEmployees()}
+function closeModal(id){document.getElementById(id)?.classList.remove('active')}
+function filterEmployees(){
+  const module=document.getElementById('taskModule');
+  const select=document.getElementById('taskEmployee');
+  if(!module||!select)return;
+  const map={Nhan_Su:'HCNS',Booking:'Booking',Y_Tuong:'Y_tuong'};
+  for(const option of select.options){
+    if(!option.dataset.department)continue;
+    option.hidden=option.dataset.department!==map[module.value]
+  }
+  if(select.selectedOptions[0]?.hidden)select.value=''
+}
+function toggleRelatedId(){
+  const sel=document.getElementById('taskRelatedType');
+  const grp=document.getElementById('relatedIdGroup');
+  if(!sel||!grp)return;
+  grp.style.display=sel.value?'block':'none'
+}
+document.addEventListener('DOMContentLoaded',function(){
+  filterEmployees();
+  toggleRelatedId();
+  @if (Model.OpenCreateModal) { <text>openModal('createTaskModal');</text> }
+})
+</script>
+</body>
+</html>

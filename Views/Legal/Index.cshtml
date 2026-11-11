@@ -1,0 +1,23 @@
+@model List<HanaMedia.Models.Booking>
+@{ Layout = "_OperationsLayout"; ViewData["Title"] = "Giám sát hợp đồng"; ViewData["Subtitle"] = "Theo dõi hồ sơ của Booking đã duyệt và chuyển hợp đồng cho người phụ trách."; var sent = ViewBag.SentBookingIds as HashSet<int> ?? new(); }
+@section PageActions { <a class="ops-button primary" href="/LegalDocuments/Edit?kind=booking"><i class="ti ti-plus" aria-hidden="true"></i> Soạn hợp đồng</a> }
+<section class="card ops-card">
+  <div class="card-head"><h2 class="card-title">Hợp đồng theo Booking</h2><span class="ops-badge neutral">@Model.Count Booking</span></div>
+  <form method="get" class="ops-filters"><label>Tình trạng hồ sơ<select name="status"><option value="all">Tất cả</option><option value="missing" selected="@(ViewBag.Status == "missing")">Chưa có hợp đồng</option><option value="pending" selected="@(ViewBag.Status == "pending")">Chờ kiểm tra</option></select></label><button class="ops-button primary">Lọc danh sách</button></form>
+  <div class="ops-table-wrap"><table class="ops-table wide"><thead><tr><th>Booking / Đối tác</th><th>Người phụ trách</th><th>Tiến độ Booking</th><th>Tình trạng hợp đồng</th><th>Hồ sơ Pháp chế</th></tr></thead><tbody>
+  @foreach (var b in Model)
+  {
+    <tr><td><span class="ops-name">#@b.Id — @b.CampaignName</span><span class="ops-sub">@b.ClientName</span></td><td>@(b.PrimaryManager?.FullName ?? "Chưa phân công")</td><td><span class="ops-badge neutral">@b.WorkflowLabel</span></td><td>
+      @if (sent.Contains(b.Id)) { <a class="ops-link" href="/LegalDocuments?kind=booking&bookingId=@b.Id">Pháp chế đã chuyển hợp đồng</a> }
+      else if (!string.IsNullOrEmpty(b.ContractFileUrl)) { <a class="ops-link" href="@b.ContractFileUrl">Hồ sơ lịch sử · v@b.ContractRevision</a> }
+      else { <span class="ops-badge warning">Chưa có hợp đồng</span> }
+      @if (!string.IsNullOrWhiteSpace(b.LegalFeedback)) { <p class="ops-muted">@b.LegalFeedback</p> }
+      @if (b.ContractStatus == "cho_phap_ly")
+      {
+        <form method="post" action="/Legal/Review/@b.Id">@Html.AntiForgeryToken()<input type="hidden" name="revision" value="@b.ContractRevision"><label class="ops-field">Nhận xét<textarea name="feedback" maxlength="2000" rows="2"></textarea></label><div class="ops-actions"><button class="ops-button" name="approve" value="true">Xác nhận đã kiểm tra</button><button class="ops-button" name="approve" value="false">Yêu cầu sửa</button></div></form>
+      }
+    </td><td><div class="ops-row-links"><a class="ops-link" href="/LegalDocuments?kind=booking&bookingId=@b.Id">Xem hồ sơ</a><a class="ops-link" href="/LegalDocuments/Edit?kind=booking&bookingId=@b.Id">Soạn hợp đồng</a></div></td></tr>
+  }
+  @if (Model.Count == 0) { <tr><td colspan="5" class="ops-empty">Không có Booking phù hợp với bộ lọc.</td></tr> }
+  </tbody></table></div>
+</section>

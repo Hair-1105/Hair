@@ -1,0 +1,202 @@
+using System.Security.Claims;
+using HanaMedia.Constants;
+using HanaMedia.Controllers;
+using HanaMedia.Models;
+using HanaMedia.Services;
+using HanaMedia.Services.Auditing;
+using HanaMedia.Services.Config;
+using HanaMedia.Services.Ideas;
+using HanaMedia.ViewModels;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+
+var config = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.json")
+    .AddJsonFile("appsettings.Development.json", true).AddUserSecrets("HanaMedia-V2-Local-Development").AddEnvironmentVariables().Build();
+var connection = new SqlConnectionStringBuilder(config.GetConnectionString("DefaultConnection"));
+connection.InitialCatalog = "HanaMedia_StandaloneQA_" + Guid.NewGuid().ToString("N");
+await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(connection.ConnectionString).Options);
+var audit = new TestAudit(); int passed = 0;
+var contractFiles = new List<string>();
+void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS " + name); passed++; }
+Employee Person(string name, string role) => new() { User = new User { Username = name, Email = name + "@example.test", Role = role, PasswordHash = "test", SecurityStamp = Guid.NewGuid().ToString() }, FullName = name, Email = name + "@example.test", Phone = "0900000000", Address = "Test", Dob = new(2000,1,1), JoinedDate = new(2020,1,1), Department = role == AppRoles.IdeaManager ? "Y_tuong" : "Booking", Position = "Staff", ContractType = "thu_viec", Status = "dang_lam_viec" };
+T As<T>(T c, Employee e) where T : Controller
+{
+    var http = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, e.User!.Id.ToString()), new Claim(ClaimTypes.Role, e.User.Role) }, "test")) };
+    c.ControllerContext = new() { HttpContext = http }; c.TempData = new TempDataDictionary(http, new TempData()); return c;
+}
+try
+{
+    await db.Database.EnsureCreatedAsync();
+    var staff = Person("booking", AppRoles.BookingStaff); var director = Person("director", AppRoles.Director); var creative = Person("creative", AppRoles.IdeaManager);
+    var a = new Kol { Name = "A", Platform = "tiktok", ProfileLink = "https://example.test", ContactInfo = "Test", Location = "Test", Status = "tiem_nang" };
+    var b = new Kol { Name = "B", Platform = "youtube", ProfileLink = "https://example.test", ContactInfo = "Test", Location = "Test", Status = "tiem_nang" };
+    db.AddRange(staff, director, creative, a, b); await db.SaveChangesAsync();
+    var controller = As(new BookingController(db,audit,new Config()),staff);
+    var ideas = new IdeaService(db,audit,new Env());
+    Booking Input() => new() { RevenueDate = DateTime.Today, ClientName = "Partner", CampaignName = "Standalone contract", JobDescription = "Deliver two videos", CampaignId = 999, BookingPrice = 10000000, Status = "dang_cho" };
+    var deadline = DateTime.Today.AddDays(10).ToString("yyyy-MM-dd");
+    var invalidDate = Input(); invalidDate.RevenueDate = DateTime.Today.AddDays(1);
+    await controller.Create(invalidDate,[a.Id,b.Id],null,deadline,null,new(){[a.Id]=4000000,[b.Id]=6000000},default);
+    Check(!await db.Bookings.AnyAsync(),"Reject future revenue date");
+    invalidDate.RevenueDate = null;
+    await controller.Create(invalidDate,[a.Id,b.Id],null,deadline,null,new(){[a.Id]=4000000,[b.Id]=6000000},default);
+    Check(!await db.Bookings.AnyAsync(),"Reject missing revenue date");
+    await controller.Create(Input(),[a.Id,b.Id],null,deadline,null,new() { [a.Id]=4000000,[b.Id]=5000000 },default);
+    Check(await db.Bookings.CountAsync()==0,"Reject allocation below budget");
+    await controller.Create(Input(),[a.Id,b.Id],null,deadline,null,new() { [a.Id]=4000000,[b.Id]=7000000 },default);
+    Check(await db.Bookings.CountAsync()==0,"Reject allocation above budget");
+    await controller.Create(Input(),[a.Id,b.Id],null,deadline,null,new() { [a.Id]=4000000,[b.Id]=6000000 },default);
+    var booking = await db.Bookings.Include(x=>x.BookingKols).SingleAsync();
+    Check(booking.CampaignId==null && !await db.Campaigns.AnyAsync(),"Create standalone Booking without campaign");
+    Check(booking.ClientName=="Partner" && booking.BookingPrice==10000000,"Partner and budget saved directly");
+    Check(booking.BookingKols.Single(x=>x.KolId==a.Id).CastAmount==1600000 && booking.BookingKols.Single(x=>x.KolId==b.Id).CastAmount==2400000,"KOL allocations 4m/6m yield 1.6m/2.4m");
+    Check(booking.CommissionPool==1000000 && booking.BookingPrice-booking.ActualCost==5000000,"Booking 10 percent and company 50 percent");
+    Check((await ideas.GetPageAsync(creative.User!.Id,AppRoles.IdeaManager,null,null,1)).Bookings.Count==0,"Unapproved Booking hidden from Idea selector");
+    var ideaInput=new SaveIdeaInputModel { Title="Creative concept",BookingId=booking.Id,Deadline=DateOnly.FromDateTime(DateTime.Today.AddDays(10)) };
+    Check(!(await ideas.CreateAsync(ideaInput,creative.User!.Id,AppRoles.IdeaManager)).Succeeded,"Forged Idea link to unapproved Booking rejected");
+    await controller.SubmitApproval(booking.Id,default);
+    await As(new BookingController(db,audit,new Config()),director).Approve(booking.Id,default);
+    Check((await ideas.GetPageAsync(creative.User!.Id,AppRoles.IdeaManager,null,null,1)).Bookings.Single().Id==booking.Id,"Approved Booking visible to Idea manager");
+    var created = await ideas.CreateAsync(ideaInput,creative.User!.Id,AppRoles.IdeaManager);
+    Check(created.Succeeded,"Create Idea linked to approved Booking: "+created.Message);
+    var idea=await db.Ideas.SingleAsync();
+    Check(idea.BookingId==booking.Id && idea.CampaignId==null && idea.ClientName==booking.ClientName,"Idea links Booking and inherits partner");
+    await controller.Edit(booking.Id,Input(),[a.Id,b.Id],null,deadline,null,new(){[a.Id]=5000000,[b.Id]=5000000},default);
+    Check(booking.BookingKols.Single(x=>x.KolId==a.Id).AllocationAmount==4000000,"Approved budget remains locked");
+    IFormFile Contract() => new FormFile(new MemoryStream(System.Text.Encoding.UTF8.GetBytes("%PDF-1.4 test contract")),0,22,"contractFile","test.pdf");
+    var directorController = As(new BookingController(db,audit,new Config()),director);
+    await directorController.SignContract(booking.Id,true,default);
+    Check(booking.ContractStatus=="da_duyet","Cannot sign without uploaded contract");
+    await As(new BookingController(db,audit,new Config()),creative).UploadContract(booking.Id,Contract(),default);
+    Check(booking.ContractFileUrl==null,"Idea manager cannot upload contract");
+    Check(await controller.UploadContract(booking.Id,Contract(),default) is ForbidResult,"Booking owner cannot upload contract; Legal owns handoff");
+    Check(booking.ContractFileUrl==null && booking.ContractRevision==0 && booking.ContractStatus=="da_duyet","Blocked upload preserves contract and lifecycle");
+    await directorController.SignContract(booking.Id,false,default);
+    Check(booking.ContractStatus=="da_duyet","Legacy sign action leaves lifecycle unchanged");
+    await directorController.SignContract(booking.Id,true,default);
+    Check(booking.ContractStatus=="da_duyet","Legacy signing is disabled");
+    await controller.Start(booking.Id,default);
+    Check(booking.WorkflowStatus=="dang_trien_khai","Approved Booking starts without signing");
+    var beforeReceipt=await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month",default,true);
+    Check(beforeReceipt.BookingRevenue==0 && beforeReceipt.BookingProfit==0 && beforeReceipt.BookingRemuneration==0 && beforeReceipt.OutstandingAmount==10000000,"Unaccepted Booking is debt, not revenue profit or commission");
+    var commissions=new PersonalBookingCommissionService(db);
+    Check((await commissions.GetAsync(staff.User!.Id)).Total==0,"No earned commission before customer payment");
+    await controller.ConfirmCustomerPayment(booking.Id,true,default,DateTime.Today);
+    Check(booking.CustomerPaidAt==null,"Cannot receive payment before signed completion");
+    await controller.Acceptance(booking.Id,Contract(),null,default);
+    contractFiles.Add(Path.Combine(Directory.GetCurrentDirectory(),"App_Data","booking-documents",Path.GetFileName(booking.AcceptanceFileUrl!)));
+    Check(booking.WorkflowStatus=="hoan_thanh" && booking.CustomerPaidAt==null,"Work completion is not paid acceptance");
+    await controller.UploadContract(booking.Id,Contract(),default);
+    Check(booking.ContractRevision==0,"Completed Booking cannot upload contracts either");
+    await controller.ConfirmCustomerPayment(booking.Id,true,default,DateTime.Today.AddDays(1));
+    Check(booking.CustomerPaidAt==null,"Reject future customer payment date");
+    await controller.ConfirmCustomerPayment(booking.Id,true,default);
+    Check(booking.CustomerPaidAt==null,"Reject missing customer payment date");
+    await controller.ConfirmCustomerPayment(booking.Id,false,default);
+    Check(booking.CustomerPaidAt==null,"Receipt requires explicit confirmation");
+    await controller.ConfirmCustomerPayment(booking.Id,true,default,DateTime.Today);
+    Check(booking.CustomerPaidAt!=null && (await commissions.GetAsync(staff.User!.Id)).CompanyUnpaid==1000000,"Receipt earns one million and shows company debt");
+    var receiptAt=booking.CustomerPaidAt;await controller.ConfirmCustomerPayment(booking.Id,true,default,DateTime.Today);
+    Check(booking.CustomerPaidAt==receiptAt && (await commissions.GetAsync(staff.User!.Id)).Total==1000000,"Repeated receipt does not double count");
+    Check((await new IdeaDashboardService(db).GetAsync()).NewIdeas==1,"Idea dashboard reads approved Booking links");
+    var reader = As(new BookingController(db,audit,new Config()),creative);
+    Check(await reader.Index(null,null,null,null,null,null,default) is ViewResult && reader.ViewBag.IsWritable == false,"Idea manager can list Bookings read-only");
+    Check(await reader.Details(booking.Id,default) is ViewResult && reader.ViewBag.IsWritable == false && reader.ViewBag.CanDraft == false,"Idea manager can read detail without edit or draft rights");
+    reader.HttpContext.Request.Method = "POST";
+    var actionContext = new ActionContext(reader.HttpContext, new Microsoft.AspNetCore.Routing.RouteData(), new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor());
+    var filter = new Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext(actionContext, new List<Microsoft.AspNetCore.Mvc.Filters.IFilterMetadata>(), new Dictionary<string,object?>(), reader);
+    reader.OnActionExecuting(filter);
+    Check(filter.Result is ForbidResult,"Idea manager POST requests forbidden by controller filter");
+    var now=DateTime.Now;
+    booking.RevenueDate = new DateTime(now.Year,now.Month,1).AddMonths(-1).AddDays(2);
+    booking.CustomerPaymentDate = now.Date;
+    await db.SaveChangesAsync();
+    var dashboard = await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month",default,true);
+    Check(dashboard.MonthlyRevenue.Count==12,"Director sees all twelve months including empty months");
+    Check(dashboard.BookingCount==1,"Director total includes historical Booking outside selected month");
+    Check((await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("day",default,true)).BookingCount==1,"Director total unchanged when switching reporting period");
+    Check(dashboard.BookingRevenue==10000000 && dashboard.BookingProfit==5000000 && dashboard.BookingRemuneration==1000000 && dashboard.OutstandingAmount==0 && dashboard.OutstandingCampaignCount==0 && booking.WorkflowStatus=="da_nghiem_thu","Paid acceptance synchronizes revenue profit commission and clears debt in receipt month");
+    Check(dashboard.MonthlyRevenue[^2].BookingValue==10000000 && dashboard.MonthlyRevenue[^2].CustomerReceipts==0 && dashboard.MonthlyRevenue[^1].BookingValue==0 && dashboard.MonthlyRevenue[^1].CustomerReceipts==10000000,"Monthly revenue separates creation month from receipt month");
+    var report = await new HanaMedia.Services.Reports.ReportService(db).GetAsync(ReportTypes.Booking,"month",director.User!.Id,AppRoles.Director);
+    Check(report!.Booking!.Revenue==dashboard.BookingRevenue && report.Booking.Cost==dashboard.BookingCost,"Financial report matches paid dashboard totals");
+    var accounting=As(new AccountingController(db,audit),director);
+    var accountingView=(ViewResult)await accounting.Index("month",DateTime.Today,default);
+    Check(((List<Booking>)accountingView.Model!).Single().Id==booking.Id,"Accounting includes paid historical Booking in receipt month");
+    booking.CustomerPaymentDate=DateTime.Today.AddMonths(-1);await db.SaveChangesAsync();
+    var priorPaid=await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month",default,true);
+    Check(priorPaid.BookingRevenue==0 && priorPaid.OutstandingAmount==0,"Prior-month payment is neither current-month revenue nor outstanding debt");
+    booking.CustomerPaymentDate=DateTime.Today;await db.SaveChangesAsync();
+    booking.ClientName="Đặng Thị Ánh"; await db.SaveChangesAsync();
+    foreach (var keyword in new[] { "Đặng Thị Ánh", "dang thi anh", "DANG", "  Đặng   Thị   Ánh  ", "Ánh" })
+    {
+        var searchResult=(ViewResult)await controller.Index(keyword,null,null,null,null,null,default);
+        Check(((IEnumerable<Booking>)searchResult.Model!).Single().Id==booking.Id,"Customer search: "+keyword);
+    }
+    var missingResult=(ViewResult)await controller.Index("khach khong ton tai",null,null,null,null,null,default);
+    Check(!((IEnumerable<Booking>)missingResult.Model!).Any(),"Unmatched customer search returns no results");
+    var filteredResult=(ViewResult)await controller.Index("dang",null,null,"dang_cho",null,null,default);
+    Check(!((IEnumerable<Booking>)filteredResult.Model!).Any(),"Customer search respects selected status filter");
+    booking.Status="huy";await db.SaveChangesAsync();
+    dashboard=await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month",default,true);
+    Check(dashboard.MonthlyRevenue.Sum(r=>r.BookingValue+r.CustomerReceipts)==0,"Canceled Bookings excluded from monthly totals");
+    Check(dashboard.BookingCount==1 && dashboard.OutstandingAmount==0,"Total includes canceled Booking but debt excludes it");
+    Check((await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month")).MonthlyRevenue.Count==0,"Monthly director metrics not loaded for other dashboards");
+    var payout = As(new AccountingController(db,audit),director);
+    Check(await payout.ConfirmDisbursement(booking.Id,"kol",booking.CastPool,default) is NotFoundResult,"Canceled Booking cannot confirm payouts");
+    booking.Status="hoan_thanh";
+    var originalReceipt=booking.CustomerPaidAt;
+    booking.CustomerPaidAt=null; await db.SaveChangesAsync();
+    Check(await payout.ConfirmDisbursement(booking.Id,"kol",booking.CastPool,default) is BadRequestObjectResult,"No payout before acceptance and customer receipt");
+    booking.CustomerPaidAt=originalReceipt; await db.SaveChangesAsync();
+    Check(await As(new AccountingController(db,audit),staff).ConfirmDisbursement(booking.Id,"kol",booking.CastPool,default) is ForbidResult,"Booking staff cannot confirm payouts");
+    Check(await payout.ConfirmDisbursement(booking.Id,"invalid",0,default) is BadRequestObjectResult,"Reject invalid payout group");
+    Check(await payout.ConfirmDisbursement(booking.Id,"kol",1,default) is ConflictObjectResult,"Reject stale payout amount");
+    var priorFinanceVersion=booking.FinanceVersion; booking.FinanceVersion=0;await db.SaveChangesAsync();
+    Check(await payout.ConfirmDisbursement(booking.Id,"kol",booking.CastPool,default) is BadRequestObjectResult,"Legacy payouts require review");
+    booking.FinanceVersion=priorFinanceVersion; await db.SaveChangesAsync();
+    booking.BookingWages.Add(new BookingWage { EmployeeId=creative.Id, Employee=creative, AllocatedWage=250000m });
+    var firstKol=booking.BookingKols.First();
+    var previousPaymentTime=DateTime.Now.AddDays(-1);
+    booking.Payments.Add(new BookingPayment { Kind="cast",PayeeId=firstKol.KolId,Amount=firstKol.CastAmount,IsPaid=true,UpdatedAt=previousPaymentTime,UpdatedByUserId=director.User!.Id });
+    await db.SaveChangesAsync();
+    var beforePayoutDashboard=await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month",default,true);
+    Check(await payout.ConfirmDisbursement(booking.Id,"kol",booking.BookingKols.Sum(k=>k.CastAmount),default) is RedirectToActionResult,"Director confirms KOL payout");
+    Check(booking.Payments.Count(p=>p.Kind=="cast" && p.IsPaid)==2 && booking.Payments.All(p=>p.UpdatedByUserId==director.User!.Id),"Each KOL payment records director and paid state");
+    Check(booking.Payments.Single(p=>p.PayeeId==firstKol.KolId && p.Kind=="cast").UpdatedAt==previousPaymentTime,"Partial payment preserves already-paid KOL record");
+    Check(!booking.Payments.Any(p=>p.Kind=="manager"),"KOL confirmation leaves commission unpaid");
+    var paymentTimes=booking.Payments.ToDictionary(p=>(p.Kind,p.PayeeId),p=>p.UpdatedAt);
+    await payout.ConfirmDisbursement(booking.Id,"kol",booking.CastPool,default);
+    Check(booking.Payments.Count==2 && booking.Payments.All(p=>p.UpdatedAt==paymentTimes[(p.Kind,p.PayeeId)]),"Duplicate confirmation does not duplicate or overwrite payments");
+    Check(await payout.ConfirmDisbursement(booking.Id,"booking",booking.CommissionPool,default) is RedirectToActionResult,"Director confirms booking commission");
+    Check(BookingPayables.For(booking).Where(p=>p.Amount>0).All(p=>p.Paid),"Both groups paid independently");
+    Check(booking.Payments.Single(p=>p.Kind=="staff" && p.PayeeId==creative.Id).Amount==250000m,"Commission confirmation pays allocated participant from other department");
+    Check(booking.Payments.Where(p=>p.Kind!="cast").Sum(p=>p.Amount)==booking.CommissionPool,"Participant plus owner commission never double counts the pool");
+    Check((await commissions.GetAsync(staff.User!.Id)).CompanyPaid==booking.CommissionPool-booking.BookingWages.Sum(w=>w.AllocatedWage),"Personal dashboard sees director-confirmed commission");
+    var afterPayoutDashboard=await new HanaMedia.Services.Dashboard.CompanyDashboardService(db).GetAsync("month",default,true);
+    Check(beforePayoutDashboard.BookingRevenue==afterPayoutDashboard.BookingRevenue && beforePayoutDashboard.OutstandingAmount==afterPayoutDashboard.OutstandingAmount && booking.CustomerPaidAt==originalReceipt,"Disbursement does not change receipt revenue or customer debt");
+    async Task<List<Booking>> FilterParticipant(int? employee, string? search = null, string? status = null)
+        => (List<Booking>)((ViewResult)await controller.Index(search,null,null,status,null,employee,default)).Model!;
+    Check((await FilterParticipant(staff.Id)).Single().Id==booking.Id,"Participant filter includes primary owner without wage row");
+    Check((await FilterParticipant(creative.Id)).Single().Id==booking.Id,"Participant filter includes allocated employee from another department");
+    Check((await FilterParticipant(director.Id)).Count==0,"Participant filter excludes unrelated employees");
+    Check((await FilterParticipant(null)).Count==1,"Clearing participant filter restores bookings");
+    Check((await FilterParticipant(staff.Id,"definitely-no-client")).Count==0,"Participant and customer filters combine");
+    Check((await FilterParticipant(staff.Id,null,"dang_cho")).Count==0,"Participant and status filters combine");
+    booking.BookingWages.Add(new BookingWage {EmployeeId=staff.Id,Employee=staff,AllocatedWage=0});await db.SaveChangesAsync();
+    Check((await FilterParticipant(staff.Id)).Count==1,"Owner also in wage list does not duplicate booking");
+    var mismatch=booking.Payments.First();mismatch.Amount+=1;
+    Check(!BookingPayables.For(booking).Single(p=>p.Kind==mismatch.Kind && p.PayeeId==mismatch.PayeeId).Paid,"Mismatched paid amount is not silently counted settled");
+    Console.WriteLine($"Passed {passed} checks.");
+}
+finally { await db.Database.EnsureDeletedAsync(); foreach(var file in contractFiles) if(File.Exists(file)) File.Delete(file); }
+sealed class TestAudit : ISystemAuditService { public void AddEvent(AuditEvent e){} public Task WriteAsync(AuditEvent e,CancellationToken ct=default)=>Task.CompletedTask; public void AddAccountEvent(int? id,string action,string detail){} }
+sealed class TempData : ITempDataProvider { public IDictionary<string,object> LoadTempData(HttpContext h)=>new Dictionary<string,object>();public void SaveTempData(HttpContext h,IDictionary<string,object> v){} }
+sealed class Config : IBusinessConfigService { public Task<BusinessConfigViewModel> GetAsync(CancellationToken ct=default)=>Task.FromResult(new BusinessConfigViewModel());public Task<BusinessConfigUpdateResult> UpdateAsync(BusinessConfigViewModel m,int id,CancellationToken ct=default)=>throw new NotSupportedException(); }
+sealed class Env : IWebHostEnvironment { public string ApplicationName{get;set;}="QA";public string EnvironmentName{get;set;}="Testing";public string WebRootPath{get;set;}=Path.GetTempPath();public string ContentRootPath{get;set;}=Path.GetTempPath();public IFileProvider WebRootFileProvider{get;set;}=new NullFileProvider();public IFileProvider ContentRootFileProvider{get;set;}=new NullFileProvider(); }
+

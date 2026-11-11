@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+@model HanaMedia.ViewModels.DirectorMonitoringViewModel
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Giám sát hệ thống (Giám đốc)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+</head>
+<body>
+<div class="layout">
+
+  <partial name="_SidebarPartial" />
+
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Báo cáo hoạt động &amp; Giám sát hệ thống</div>
+        <div class="page-sub">Theo dõi tổng lượng truy cập, bảo mật mạng nội bộ và các cảnh báo bất thường do AdminIT cung cấp</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Chỉ số vận hành hệ thống</div>
+        </div>
+        <div class="monitor-row">
+          <div class="monitor-label"><i class="ti ti-login-2"></i>Lượt đăng nhập thành công hôm nay</div>
+          <div class="monitor-value">@Model.TodayLoginCount lượt</div>
+        </div>
+        <div class="monitor-row">
+          <div class="monitor-label"><i class="ti ti-users-group"></i>Người dùng hoạt động 15 phút gần đây</div>
+          <div class="monitor-value">@Model.RecentActiveUserCount người</div>
+        </div>
+        <div class="monitor-row">
+          <div class="monitor-label"><i class="ti ti-wifi-off"></i>Nỗ lực truy cập ngoài mạng LAN/Wifi bị chặn</div>
+          <div class="monitor-value">@Model.TodayBlockedNetworkCount lần</div>
+        </div>
+        <div class="monitor-row">
+          <div class="monitor-label"><i class="ti ti-alert-triangle"></i>Cảnh báo bảo mật</div>
+          <div class="monitor-value" style="color:var(--amber);">@Model.TodaySecurityAlertCount cảnh báo</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Cảnh báo bất thường hiện tại</div>
+        </div>
+        @if (Model.Alerts.Count == 0)
+        {
+          <div class="alert-box" style="margin-top:0;">
+            <i class="ti ti-shield-check"></i>
+            <div>
+              <div class="alert-title">Chưa có cảnh báo mức cao</div>
+              <div class="alert-desc">Không phát hiện tài khoản tự khóa, truy cập ngoài mạng hoặc xóa hàng loạt trong hôm nay.</div>
+            </div>
+          </div>
+        }
+        else
+        {
+          @foreach (var alert in Model.Alerts)
+          {
+            <div class="alert-box" style="margin-top:10px;">
+              <i class="ti @alert.Icon"></i>
+              <div>
+                <div class="alert-title">@alert.Title</div>
+                <div class="alert-desc">@alert.Summary</div>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-head">
+        <div class="card-title">Tổng quan nhật ký vận hành (Audit Log tổng quan)</div>
+      </div>
+      <div class="alert-box" style="background: var(--blue-50); border-color: var(--blue-100); color: var(--blue-700); margin-top: 0; margin-bottom: 16px;">
+        <i class="ti ti-info-circle" style="color: var(--blue-700);"></i>
+        <div>
+          <div class="alert-title" style="color: var(--blue-900);">Thông báo phân quyền truy cập</div>
+          <div class="alert-desc" style="color: var(--blue-900);">Giám đốc chỉ xem thống kê hoạt động tổng quan. Để truy cập nhật ký chi tiết hoặc quản trị tài khoản, vui lòng liên hệ AdminIT.</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Module tác động</th>
+            <th>Số lượng thao tác</th>
+            <th>Hành vi phổ biến</th>
+            <th>Lần cuối cập nhật</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var module in Model.Modules)
+          {
+            <tr>
+              <td><strong>@module.ModuleLabel</strong></td>
+              <td>@module.ActionCount thao tác</td>
+              <td>@module.CommonAction</td>
+              <td>@(module.LastUpdatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa có dữ liệu")</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

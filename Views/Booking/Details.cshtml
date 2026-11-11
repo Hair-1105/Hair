@@ -1,0 +1,1228 @@
+@model HanaMedia.Models.Booking
+@using HanaMedia.Constants
+@using System.Security.Claims
+@{
+    Layout = null;
+    var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
+    var statusClass = Model.Status switch
+    {
+        "dang_cho" => "status-badge-cho",
+        "thuong_luong" => "status-badge-thuongluong",
+        "da_chot" => "status-badge-chot",
+        "dang_trien_khai" => "status-badge-trienkhai",
+        "hoan_thanh" => "status-badge-hoanthanh",
+        "huy" => "status-badge-huy",
+        _ => "status-badge-cho"
+    };
+
+    var statusLabel = Model.Status switch
+    {
+        "dang_cho" => "Chờ",
+        "thuong_luong" => "Thương lượng",
+        "da_chot" => "Chốt",
+        "dang_trien_khai" => "Triển khai",
+        "hoan_thanh" => "Hoàn thành",
+        "huy" => "Hủy",
+        _ => Model.Status
+    };
+
+    var today = DateOnly.FromDateTime(DateTime.Now);
+    string deadlineColorClass = "text-main";
+    if (Model.Status == "hoan_thanh")
+    {
+        deadlineColorClass = "text-success";
+    }
+    else if (Model.Deadline < today)
+    {
+        deadlineColorClass = "text-danger";
+    }
+    else if (Model.Deadline <= today.AddDays(3))
+    {
+        deadlineColorClass = "text-warning";
+    }
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking #@Model.Id — @Model.ClientName | HanaMedia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+  <link rel="stylesheet" href="~/css/disbursement.css" asp-append-version="true">
+  <style>
+    :root {
+      --bg-main: #F5F7FA;
+      --sidebar-bg: #0F2F56;
+      --primary: #1769E0;
+      --primary-hover: #1255B8;
+      --text-main: #172B4D;
+      --text-muted: #6B7A90;
+      --border-color: #E4E9F0;
+      --card-bg: #FFFFFF;
+      
+      --success: #168A4A;
+      --success-bg: #F0FDF4;
+      --danger: #D92D20;
+      --danger-bg: #FEF2F2;
+      --warning: #B7791F;
+      --warning-bg: #FEFCE8;
+      --info: #0284C7;
+      --info-bg: #F0F9FF;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .page-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 32px 40px 32px;
+    }
+
+    /* BREADCRUMB & BACK LINK */
+    .page-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .back-btn {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s ease;
+    }
+    .back-btn:hover {
+      color: var(--primary);
+    }
+    .breadcrumb {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* HEADER */
+    .page-header {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .header-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .header-actions {
+      display: flex; gap: 10px; align-items: center;
+      margin-left: auto;
+    }
+    .booking-id-tag {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+    .page-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0;
+      line-height: 1.2;
+    }
+    .header-sub {
+      margin-top: 8px;
+      font-size: 13.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* FINANCE GRID (50/10/40) — 1 cột mỗi ô 1 hàng (phù hợp sidebar 360px) */
+    .finance-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    @@media (max-width: 720px) { .finance-grid { grid-template-columns: 1fr; } }
+    .finance-cell {
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #fafbfc;
+    }
+    .finance-cell.company { background: linear-gradient(135deg,#eef2ff,#e0e7ff); border-color: #c7d2fe; }
+    .finance-cell.q1 { background: linear-gradient(135deg,#fef3c7,#fde68a); border-color: #fcd34d; }
+    .finance-cell.cast { background: linear-gradient(135deg,#dcfce7,#bbf7d0); border-color: #86efac; }
+    .finance-cell-label {
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.3px;
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .finance-cell-label i { font-size: 14px; }
+    .finance-pct {
+      margin-left: auto;
+      background: rgba(255,255,255,0.7); padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; color: var(--primary-blue);
+    }
+    .finance-cell-value {
+      font-size: 16px; font-weight: 700; color: var(--primary-blue); margin-top: 6px;
+    }
+
+    /* KOL TABLE */
+    .kol-table {
+      width: 100%; border-collapse: collapse; font-size: 14px;
+    }
+    .kol-table th, .kol-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border-color);
+      text-align: left;
+    }
+    .kol-table th {
+      background: #f8fafc; font-weight: 600; font-size: 11.5px;
+      text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);
+    }
+    .kol-table td.num, .kol-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .kol-table tfoot td {
+      background: #f1f5f9; border-top: 2px solid var(--primary-blue);
+      border-bottom: none; color: var(--primary-blue);
+    }
+    .kol-cell-name { display: flex; align-items: center; gap: 10px; }
+    .kol-avatar-sm {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--blue-50); color: var(--blue-600);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      flex-shrink: 0;
+    }
+    .platform-tag {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      background: var(--blue-50); color: var(--blue-700); font-size: 11.5px; font-weight: 600;
+    }
+
+    /* STATUS BADGES */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .status-badge-cho { background: #F1F5F9; color: #475569; border-color: #CBD5E1; }
+    .status-badge-thuongluong { background: #EFF6FF; color: var(--primary); border-color: #BFDBFE; }
+    .status-badge-chot { background: #FEFCE8; color: var(--warning); border-color: #FEF08A; }
+    .status-badge-trienkhai { background: #F5F3FF; color: #7C3AED; border-color: #DDD6FE; }
+    .status-badge-hoanthanh { background: var(--success-bg); color: var(--success); border-color: #BBF7D0; }
+    .status-badge-huy { background: var(--danger-bg); color: var(--danger); border-color: #FECACA; }
+
+    /* LAYOUT GRID */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      align-items: start;
+    }
+    @@media (max-width: 1100px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ENTERPRISE CARD */
+    .enterprise-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .card-header-clean {
+      margin-bottom: 18px;
+    }
+    .card-header-flex {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .card-title-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-subtitle-text {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* INFO GRID */
+    .info-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px 24px;
+    }
+    @@media (max-width: 640px) {
+      .info-grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    .info-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .info-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .info-value {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .kol-link {
+      color: var(--primary);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .kol-link:hover {
+      text-decoration: underline;
+    }
+    .platform-chip {
+      font-size: 11px;
+      background: #F1F5F9;
+      color: #475569;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    /* COLOR UTILS FOR DATA */
+    .text-success { color: var(--success); }
+    .text-danger { color: var(--danger); }
+    .text-warning { color: var(--warning); }
+    .text-main { color: var(--text-main); }
+    .text-muted-italic { color: var(--text-muted); font-style: italic; }
+
+    /* CONTENT BOXES */
+    .job-desc-box {
+      background: #F8FAFC;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+      color: var(--text-main);
+      word-break: break-word;
+      line-height: 1.6;
+    }
+    .notes-content {
+      font-size: 14px;
+      color: var(--text-main);
+      background: #F8FAFC;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .external-post-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      word-break: break-all;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .external-post-link:hover {
+      text-decoration: underline;
+    }
+
+    /* FINANCIAL METRICS */
+    .financial-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+    }
+    .financial-metric-group {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .metric-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .metric-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric-value {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .metric-value .currency {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .primary-value { color: var(--primary); }
+    .danger-value { color: var(--danger); }
+    .success-value { color: var(--success); }
+    .metric-divider {
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    /* LEDGER TABLE FOR WAGES */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+    }
+    .ledger-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .ledger-table th {
+      background: #F8FAFC;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+    }
+    .ledger-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+      color: var(--text-main);
+    }
+    .ledger-table tbody tr:hover {
+      background-color: #F8FAFC;
+    }
+    .ledger-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .user-avatar-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #EFF6FF;
+      color: var(--primary);
+      border: 1px solid #BFDBFE;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .user-name {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .role-text {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .amount-display {
+      font-weight: 700;
+      color: var(--success);
+    }
+
+    .wage-input-field {
+      width: 160px;
+      padding: 6px 10px;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-align: right;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-main);
+      transition: border-color 0.15s ease;
+    }
+    .wage-input-field:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(23, 105, 224, 0.1);
+    }
+
+    .total-allocated-badge {
+      background: #F8FAFC;
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .badge-amount {
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .pct-calc-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      background: #EFF6FF;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .wage-form-footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+    .alert-banner-danger {
+      background: var(--danger-bg);
+      border: 1px solid #FECACA;
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn-save-allocation {
+      background: var(--primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 9px 20px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.15s ease;
+    }
+    .btn-save-allocation:hover {
+      background: var(--primary-hover);
+    }
+
+    /* DOCUMENTS LIST */
+    .document-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .document-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: #F8FAFC;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+    .doc-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .doc-icon.pdf {
+      background: #FEF2F2;
+      color: var(--danger);
+      border: 1px solid #FEE2E2;
+    }
+    .doc-icon.excel {
+      background: #F0FDF4;
+      color: var(--success);
+      border: 1px solid #DCFCE7;
+    }
+    .doc-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .doc-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .doc-action-btn {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    .doc-action-btn:hover {
+      text-decoration: underline;
+    }
+    .doc-status-none {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* MODULE 11 STEPPER & WORKFLOW STYLES */
+    .contract-stepper {
+      margin: 16px 0;
+      padding: 16px 12px;
+      background: #F8FAFC;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+    .stepper-track {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+    .stepper-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+      flex: 1;
+    }
+    .stepper-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      border: 2px solid #CBD5E1;
+      color: #64748B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+    }
+    .stepper-item.active .stepper-circle {
+      border-color: var(--primary);
+      background: #EFF6FF;
+      color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(23, 105, 224, 0.15);
+    }
+    .stepper-item.completed .stepper-circle {
+      border-color: var(--success);
+      background: var(--success);
+      color: #FFFFFF;
+    }
+    .stepper-item.rejected .stepper-circle {
+      border-color: var(--danger);
+      background: var(--danger);
+      color: #FFFFFF;
+    }
+    .stepper-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-top: 6px;
+    }
+    .stepper-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .stepper-line {
+      flex: 1;
+      height: 2px;
+      background: #E2E8F0;
+      margin: 0 -10px;
+      position: relative;
+      top: -14px;
+      z-index: 1;
+    }
+    .stepper-line.completed {
+      background: var(--success);
+    }
+    .workflow-action-box {
+      margin-top: 16px;
+    }
+    .action-card-prompt {
+      background: #F0F9FF;
+      border: 1px solid #BAE6FD;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .action-card-info {
+      background: #F8FAFC;
+      border: 1px solid var(--border-color);
+      padding: 14px 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .action-card-sign {
+      background: #FEFCE8;
+      border: 1px solid #FEF08A;
+      padding: 18px;
+      border-radius: 10px;
+    }
+    .action-card-signed {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      padding: 18px;
+      border-radius: 10px;
+    }
+    .sign-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 13.5px;
+      cursor: pointer;
+      background: #FFFFFF;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #E2E8F0;
+    }
+    .file-input-clean {
+      font-size: 13px;
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: #FFFFFF;
+    }
+    .btn-action-outline-danger {
+      background: #FFFFFF;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-action-outline-danger:hover {
+      background: #FEF2F2;
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  
+  <partial name="_SidebarPartial" />
+
+  <main class="main">
+    <div class="page-container">
+      
+      <!-- Top Navigation & Breadcrumb -->
+      <div class="page-nav">
+        <a href="/Bookings" class="back-btn">
+          <i class="ti ti-arrow-left"></i> Quay lại danh sách Booking
+        </a>
+        <div class="breadcrumb">Booking / Chi tiết Booking</div>
+      </div>
+
+      <!-- TempData Flash Banners -->
+      @if (TempData["SuccessMessage"] != null)
+      {
+        <div class="alert-banner-success" style="background:#F0FDF4; border:1px solid #BBF7D0; color:#168A4A; padding:12px 16px; border-radius:8px; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+          <i class="ti ti-circle-check" style="font-size:18px;"></i> @TempData["SuccessMessage"]
+        </div>
+      }
+      @if (TempData["ErrorMessage"] != null)
+      {
+        <div class="alert-banner-danger" style="background:#FEF2F2; border:1px solid #FECACA; color:#D92D20; padding:12px 16px; border-radius:8px; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+          <i class="ti ti-alert-triangle" style="font-size:18px;"></i> @TempData["ErrorMessage"]
+        </div>
+      }
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="header-top">
+          <div class="header-title-group">
+            <span class="booking-id-tag">BOOKING #@Model.Id</span>
+            <h1 class="page-title">@Model.ClientName</h1>
+            <span class="status-badge @statusClass">@Model.WorkflowLabel</span>
+          </div>
+          <div class="header-actions">
+            @if (role == AppRoles.Accountant) { <span class="status-badge"><i class="ti ti-eye"></i> Chỉ xem</span> }
+            </div>
+        </div>
+        <div class="header-sub">
+          <span><i class="ti ti-target" style="color: var(--primary);"></i> Booking: <strong>@(Model.Campaign?.Name ?? Model.CampaignName)</strong></span>
+        </div>
+      </div>
+
+      <!-- Content Layout Grid (Main 70%, Right 30%) -->
+      <div class="content-grid">
+        
+        <!-- MAIN CONTENT LEFT -->
+        <div>
+          
+          <!-- Booking Overview Card -->
+          <div class="enterprise-card">
+            <div class="card-header-clean">
+              <h2 class="card-title-text"><i class="ti ti-info-circle" style="color: var(--primary);"></i> THÔNG TIN BOOKING</h2>
+              <span class="card-subtitle-text">Thông tin chi tiết về đối tác và nhân sự phụ trách</span>
+            </div>
+
+            <div class="info-grid-2">
+              <div class="info-cell">
+                <span class="info-label">KOL / KOC HỢP TÁC</span>
+                <div class="info-value" style="display:flex; flex-direction:column; gap:4px;">
+                  @if (Model.BookingKols.Any())
+                  {
+                    foreach(var bk in Model.BookingKols) {
+                      @if (role == AppRoles.Accountant) { <span><i class="ti ti-user-star"></i> @bk.Kol?.Name <span class="platform-chip">@bk.Kol?.Platform</span></span> }
+                      else {
+                      <a href="/Kols/Details/@bk.KolId" class="kol-link">
+                        <i class="ti ti-user-star"></i> @bk.Kol?.Name <span class="platform-chip">@bk.Kol?.Platform</span>
+                      </a>
+                      }
+                    }
+                  }
+                  else if (Model.Kol != null)
+                  {
+                    @if (role == AppRoles.Accountant) { <span><i class="ti ti-user-star"></i> @Model.KolNames <span class="platform-chip">@Model.Kol.Platform</span></span> }
+                    else {
+                    <a href="/Kols/Details/@Model.KolId" class="kol-link">
+                      <i class="ti ti-user-star"></i> @Model.KolNames <span class="platform-chip">@Model.Kol.Platform</span>
+                    </a>
+                    }
+                  }
+                  else
+                  {
+                    <span class="text-muted-italic">N/A</span>
+                  }
+                </div>
+              </div>
+
+              <div class="info-cell">
+                <span class="info-label">NGƯỜI PHỤ TRÁCH CHÍNH</span>
+                <div class="info-value">
+                  <span>@(Model.PrimaryManager?.FullName ?? "Chưa phân công")</span>
+                  @if (Model.PrimaryManager != null && !string.IsNullOrEmpty(Model.PrimaryManager.Position))
+                  {
+                    <span style="color: var(--text-muted); font-size: 13px; font-weight: 400;"> (@Model.PrimaryManager.Position)</span>
+                  }
+                </div>
+              </div>
+
+              <div class="info-cell">
+                <span class="info-label">THỜI HẠN HOÀN THÀNH (DEADLINE)</span>
+                <div class="info-value @deadlineColorClass">
+                  <i class="ti ti-calendar"></i> @Model.Deadline.ToString("dd/MM/yyyy")
+                </div>
+              </div>
+
+              <div class="info-cell">
+                <span class="info-label">NGÀY ĐĂNG TẢI THỰC TẾ</span>
+                <div class="info-value @(Model.PostingDate.HasValue ? "text-success" : "text-muted-italic")">
+                  <i class="ti ti-calendar-check"></i> @(Model.PostingDate.HasValue ? Model.PostingDate.Value.ToString("dd/MM/yyyy") : "Chưa đăng tải")
+                </div>
+              </div>
+              @if (Model.Status == "hoan_thanh")
+              {
+                <div class="info-cell"><span class="info-label">NGÀY BÁO HOÀN THÀNH</span><div class="info-value">@(Model.CompletedAt?.ToString("dd/MM/yyyy") ?? "Chưa có dữ liệu lịch sử")</div></div>
+                <div class="info-cell"><span class="info-label">HẠN THU (SAU 1 THÁNG)</span><div class="info-value @(Model.CustomerPaidAt == null && Model.CollectionDueDate < DateTime.Today ? "text-danger" : "")">@(Model.CollectionDueDate?.ToString("dd/MM/yyyy") ?? "Chưa xác định")</div></div>
+              }
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.PostLink))
+            {
+              <div style="margin-top: 20px; border-top: 1px dashed var(--border-color); padding-top: 16px;">
+                <span class="info-label">LINK BÀI VIẾT / VIDEO SẢN PHẨM</span>
+                <div class="info-value" style="margin-top: 4px;">
+                  <a href="@Model.PostLink" target="_blank" class="external-post-link">
+                    @Model.PostLink <i class="ti ti-external-link"></i>
+                  </a>
+                </div>
+              </div>
+            }
+          </div>
+
+          <partial name="_BookingWorkflowV4" model="Model" />
+          <!-- Job Description Card -->
+          <div class="enterprise-card">
+            <div class="card-header-clean">
+              <h2 class="card-title-text"><i class="ti ti-file-text" style="color: var(--primary);"></i> NỘI DUNG CÔNG VIỆC</h2>
+              <span class="card-subtitle-text">Mô tả và yêu cầu chi tiết công việc cho Booking</span>
+            </div>
+            <div class="job-desc-box">
+              @if (!string.IsNullOrWhiteSpace(Model.JobDescription))
+              {
+                <div>@Model.JobDescription</div>
+              }
+              else
+              {
+                <div class="text-muted-italic">Chưa có nội dung công việc chi tiết.</div>
+              }
+            </div>
+          </div>
+
+          <!-- Notes Card -->
+          <div class="enterprise-card">
+            <div class="card-header-clean">
+              <h2 class="card-title-text"><i class="ti ti-notes" style="color: var(--primary);"></i> GHI CHÚ THÊM</h2>
+            </div>
+            <div class="notes-content">
+              @if (!string.IsNullOrWhiteSpace(Model.Notes))
+              {
+                <div>@Model.Notes</div>
+              }
+              else
+              {
+                <div class="text-muted-italic">Không có ghi chú.</div>
+              }
+            </div>
+          </div>
+
+          <partial name="_BookingWagesV4" model="Model" />
+          @if ((User.IsInRole(AppRoles.Director) || User.IsInRole(AppRoles.Accountant)) && Model.WorkflowStatus == "da_nghiem_thu")
+          {
+              <section class="card disbursement-detail" style="padding:24px; margin-top:20px;">
+                  <h3>Chi trả sau nghiệm thu</h3>
+                  <partial name="_DirectorDisbursement" model="Model" />
+              </section>
+          }
+
+          @* === BẢNG KOL/KOC THAM GIA + CÁT-XÊ TỪNG NGƯỜI === *@
+          @if (Model.BookingKols.Any())
+          {
+            var kolCastPool = Model.CastPool;
+            <div class="enterprise-card">
+              <div class="card-header-clean">
+                <h2 class="card-title-text"><i class="ti ti-user-star" style="color: var(--secondary-blue);"></i> KOL / KOC THAM GIA &amp; THÙ LAO</h2>
+                <span class="card-subtitle-text">Chi tiết cát-xê từng người trong booking này.</span>
+              </div>
+              <div class="table-responsive">
+                <table class="kol-table">
+                  <thead>
+                    <tr>
+                      <th style="width:42px;">#</th>
+                      <th>KOL / KOC</th>
+                      <th>Nền tảng</th>
+                      <th class="num">Giá trị phân bổ</th>
+                      <th class="num">Cát-xê</th>
+                      <th class="num">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @{
+                      var kIdx = 0;
+                      foreach (var k in Model.BookingKols)
+                      {
+                        kIdx++;
+                        var kPct = kolCastPool > 0 ? Math.Round(k.CastAmount / Model.BookingPrice * 100m, 2) : 0;
+                        <tr>
+                          <td>@kIdx</td>
+                          <td>
+                            <div class="kol-cell-name">
+                              <span class="kol-avatar-sm"><i class="ti ti-user-star"></i></span>
+                              <strong>@k.Kol?.Name</strong>
+                            </div>
+                          </td>
+                          <td><span class="platform-tag">@k.Kol?.Platform</span></td>
+                          <td class="num">@k.AllocationAmount.ToString("N0") đ</td>
+                          <td class="num"><strong>@k.CastAmount.ToString("N0") đ</strong></td>
+                          <td class="num">@kPct.ToString("0.##")%</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3"><strong>Tổng cát-xê KOL/KOC</strong></td>
+                      <td class="num">@Model.BookingKols.Sum(k => k.AllocationAmount).ToString("N0") đ</td>
+                      <td class="num"><strong>@kolCastPool.ToString("N0") đ</strong></td>
+                      <td class="num"><strong>@Model.CastPercent%</strong></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- RIGHT SIDEBAR (30%) -->
+        <div>
+          
+          <!-- Financial Summary Card -->
+          <div class="enterprise-card financial-card">
+            <div class="card-header-clean">
+              <h2 class="card-title-text"><i class="ti ti-chart-pie" style="color: var(--primary);"></i> TỔNG QUAN TÀI CHÍNH</h2>
+            </div>
+            
+            <div class="financial-metric-group">
+              <div class="metric-box">
+                <span class="metric-label">GIÁ BOOKING</span>
+                <div class="metric-value primary-value">
+                  @Model.BookingPrice.ToString("N0") <span class="currency">VNĐ</span>
+                </div>
+              </div>
+
+              <div class="metric-divider"></div>
+
+              <div class="metric-box">
+                <span class="metric-label">CHI PHÍ THỰC TẾ</span>
+                <div class="metric-value danger-value">
+                  @Model.ActualCost.ToString("N0") <span class="currency">VNĐ</span>
+                </div>
+              </div>
+
+              @{
+                decimal profit = Model.BookingPrice - Model.ActualCost;
+                string profitClass = profit >= 0 ? "success-value" : "danger-value";
+              }
+              <div class="metric-divider"></div>
+
+              <div class="metric-box">
+                <span class="metric-label">LỢI NHUẬN / CHÊNH LỆCH</span>
+                <div class="metric-value @profitClass">
+                  @profit.ToString("N0") <span class="currency">VNĐ</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          @if (ViewBag.IsWritable == true && Model.Status == "hoan_thanh" && Model.IsDirectorApproved && Model.CustomerPaidAt == null)
+          {
+            <form method="post" action="/Bookings/ConfirmCustomerPayment/@Model.Id" class="card" style="padding:20px;margin-bottom:20px;">
+              @Html.AntiForgeryToken()
+              <label>Ngày khách thanh toán thực tế<input class="form-control" type="date" name="customerPaymentDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" min="1900-01-01" max="@DateTime.Today.ToString("yyyy-MM-dd")" required></label>
+              <label><input type="checkbox" name="receivedPayment" value="true" required> Tôi xác nhận đã nhận đủ tiền khách hàng cho Booking này</label>
+              <button type="submit" class="btn btn-primary">Xác nhận khách đã thanh toán</button>
+            </form>
+          }
+          <p>Ngày ghi nhận Booking: @((Model.RevenueDate ?? Model.CreatedAt)?.ToString("dd/MM/yyyy") ?? "—") · Ngày tạo trên hệ thống: @(Model.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "—")</p>
+          @if (Model.CustomerPaidAt != null)
+          {
+            <p class="status-badge">Ngày khách thanh toán: @((Model.CustomerPaymentDate ?? Model.CustomerPaidAt).Value.ToString("dd/MM/yyyy")) · Xác nhận trên hệ thống: @Model.CustomerPaidAt.Value.ToString("dd/MM/yyyy HH:mm")</p>
+          }
+          @* === PHÂN BỔ GIÁ TRỊ BOOKING (50% công ty / 10% QL / 40% KOL/KOC) === *@
+          @if (Model.FinanceVersion == 1)
+          {
+            var commissionPool = Model.CommissionPool;
+            var castPool = Model.CastPool;
+            <div class="enterprise-card">
+              <div class="card-header-clean">
+                <h2 class="card-title-text"><i class="ti ti-coin" style="color: var(--primary);"></i> PHÂN BỔ GIÁ TRỊ BOOKING</h2>
+                <span class="card-subtitle-text">Tổng giá trị @Model.BookingPrice.ToString("N0") đ · Công ty @(Model.CompanyPercent)% · QL @(Model.CommissionPercent)% · KOL/KOC @(Model.CastPercent)%</span>
+              </div>
+              <div class="finance-grid">
+                <div class="finance-cell company">
+                  <div class="finance-cell-label"><i class="ti ti-building-bank"></i> Lợi nhuận công ty <span class="finance-pct">@(Model.CompanyPercent)%</span></div>
+                  <div class="finance-cell-value">@((Model.BookingPrice * Model.CompanyPercent / 100m).ToString("N0")) đ</div>
+                </div>
+                <div class="finance-cell q1">
+                  <div class="finance-cell-label"><i class="ti ti-user-shield"></i> Hoa hồng người phụ trách (@(Model.PrimaryManager?.FullName ?? "—")) <span class="finance-pct">@(Model.CommissionPercent)%</span></div>
+                  <div class="finance-cell-value">@commissionPool.ToString("N0") đ</div>
+                </div>
+                <div class="finance-cell cast">
+                  <div class="finance-cell-label"><i class="ti ti-users-group"></i> Cát-xê chia KOL/KOC <span class="finance-pct">@(Model.CastPercent)%</span></div>
+                  <div class="finance-cell-value">@castPool.ToString("N0") đ</div>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Documents Card -->
+          <div class="enterprise-card">
+            <div class="card-header-clean">
+              <h2 class="card-title-text"><i class="ti ti-files" style="color: var(--primary);"></i> HỒ SƠ TÀI LIỆU HỢP TÁC</h2>
+              <span class="card-subtitle-text">Hợp đồng, bản nghiệm thu và tài liệu lịch sử</span>
+            </div>
+            @{
+              var legalContracts = ViewBag.LegalContracts as List<HanaMedia.Models.LegalDocument> ?? new();
+            }
+            <div class="enterprise-card" id="booking-legal-contracts" style="border-left:4px solid var(--primary)">
+              <div class="card-header-clean"><h2 class="card-title-text"><i class="ti ti-file-text" style="color:var(--primary)"></i> HỢP ĐỒNG TỪ PHÁP CHẾ</h2><span class="card-subtitle-text">Pháp chế soạn và chuyển hợp đồng. Booking xem hoặc tải tài liệu tại đây.</span></div>
+              @foreach (var contract in legalContracts)
+              {
+                <div class="doc-item" style="margin-bottom:12px"><div class="doc-info">
+                  <span class="doc-name">@contract.Title</span>
+                  <span class="card-subtitle-text">Đã chuyển @contract.SentAt?.ToString("dd/MM/yyyy HH:mm")</span>
+                  <a class="doc-action-btn" href="/LegalDocuments/Details/@contract.Id">Xem hợp đồng <i class="ti ti-arrow-right"></i></a>
+                  @if (contract.AttachmentName != null) { <a class="doc-action-btn" href="/LegalDocuments/Attachment/@contract.Id"><i class="ti ti-download"></i> Tải @contract.AttachmentOriginalName</a> }
+                </div></div>
+              }
+              @if (legalContracts.Count == 0) { <p class="card-subtitle-text">Chưa có hợp đồng Pháp chế chuyển cho bạn trong Booking này.</p> }
+              @if (!string.IsNullOrEmpty(Model.ContractFileUrl))
+              {
+                <div class="doc-item"><div class="doc-info"><span class="doc-name">Hợp đồng đã lưu trước đây · v@Model.ContractRevision</span><a class="doc-action-btn" href="@Model.ContractFileUrl"><i class="ti ti-download"></i> Tải hồ sơ lịch sử</a></div></div>
+              }
+            </div>
+            @* ====== BẢN NGHIỆM THU ====== *@
+            <div class="enterprise-card" style="border-left: 4px solid @(string.IsNullOrEmpty(Model.AcceptanceFileUrl) ? "#CBD5E1" : "var(--success)");">
+              <div class="card-header-clean">
+                <h2 class="card-title-text">
+                  <i class="ti ti-certificate" style="color: @(string.IsNullOrEmpty(Model.AcceptanceFileUrl) ? "var(--text-muted)" : "var(--success)");"></i>
+                  BẢN NGHIỆM THU
+                </h2>
+                <span class="card-subtitle-text">
+                  @if (!string.IsNullOrEmpty(Model.AcceptanceFileUrl))
+                  {
+                    <span style="color:var(--success); font-weight:600;"><i class="ti ti-circle-check"></i> Đã có bản nghiệm thu</span>
+                  }
+                  else if (Model.ContractStatus == "da_ky")
+                  {
+                    <span style="color:var(--warning);">Chờ upload bản nghiệm thu để hoàn thành booking.</span>
+                  }
+                  else
+                  {
+                    <span style="color:var(--text-muted);">Chưa có tài liệu hoàn thành công việc.</span>
+                  }
+                </span>
+              </div>
+              @if (!string.IsNullOrEmpty(Model.AcceptanceFileUrl))
+              {
+                <div style="margin-bottom:12px;">
+                  <button type="button" class="doc-action-btn" data-booking-id="@Model.Id" data-kind="acceptance" data-name="Bản nghiệm thu" onclick="checkAndDownload(this)"
+                          style="background:var(--success); color:#fff; padding:9px 16px; border-radius:8px; font-size:13.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:none; cursor:pointer;">
+                    <i class="ti ti-download"></i> Tải bản nghiệm thu
+                  </button>
+                </div>
+              }
+              @if (ViewBag.IsWritable == true && Model.IsDirectorApproved && Model.Status == "dang_trien_khai")
+              {
+                <form method="post" action="/Bookings/Acceptance/@Model.Id" enctype="multipart/form-data" style="margin-top:4px;">
+                  @Html.AntiForgeryToken()
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div>
+                      <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">File nghiệm thu *</label>
+                      <input type="file" name="acceptanceFile" accept=".pdf,.docx,.jpg,.jpeg,.png" required
+                             style="width:100%; padding:9px 12px; border:1px solid #d2ddec; border-radius:8px; font-size:14px;" />
+                    </div>
+                    <div>
+                      <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Link bài đăng (HTTPS)</label>
+                      <input type="url" name="postLink" placeholder="https://tiktok.com/..." value="@Model.PostLink"
+                             style="width:100%; padding:9px 12px; border:1px solid #d2ddec; border-radius:8px; font-size:14px;" />
+                    </div>
+                    <div>
+                      <button type="submit" style="background:var(--success); color:#fff; padding:9px 16px; border-radius:8px; font-size:13.5px; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; width:fit-content;">
+                        <i class="ti ti-check"></i> Hoàn thành công việc
+                      </button>
+                    </div>
+                  </div>
+                  <p style="color:var(--text-muted); font-size:12px; margin-top:8px;">
+                    <i class="ti ti-info-circle"></i> Hoàn thành công việc sẽ đánh dấu booking hoàn thành và ghi nhận ngày đăng tải thực tế.
+                  </p>
+                </form>
+              }
+            </div>
+
+            @* ====== PHẢN HỒI PHÁP LÝ ====== *@
+            @if (!string.IsNullOrWhiteSpace(Model.LegalFeedback) && Model.ContractStatus != "phap_ly_tu_choi")
+          {
+            <div class="enterprise-card" style="border-left: 4px solid var(--green);">
+              <div class="card-header-clean">
+                <h2 class="card-title-text"><i class="ti ti-message-2" style="color: var(--green);"></i> PHẢN HỒI TỪ PHÁP LÝ</h2>
+              </div>
+              <p style="margin:0; color:var(--text-color); font-size:14px;">@Model.LegalFeedback</p>
+              @if (Model.LegalReviewedAt.HasValue)
+              {
+                <p style="margin:6px 0 0; color:var(--muted-text); font-size:12.5px;">
+                  <i class="ti ti-clock"></i> @Model.LegalReviewedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                </p>
+              }
+            </div>
+          }
+
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<partial name="_DocumentDownloaderPartial" />
+
+
+</body>
+</html>
+

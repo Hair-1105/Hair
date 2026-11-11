@@ -1,0 +1,367 @@
+@model IEnumerable<HanaMedia.Models.Booking>
+@{
+    var pendingList = Model?.Where(b => b.ContractStatus == "cho_ky").ToList() ?? new List<HanaMedia.Models.Booking>();
+    var signedList = Model?.Where(b => b.ContractStatus == "da_ky").ToList() ?? new List<HanaMedia.Models.Booking>();
+    var rejectedList = Model?.Where(b => b.ContractStatus == "tu_choi").ToList() ?? new List<HanaMedia.Models.Booking>();
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Ký Hợp Đồng (Giám đốc)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+  <style>
+    .tab-headers {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0;
+      margin-bottom: 18px;
+    }
+    .tab-header {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px 16px;
+      position: relative;
+      border-radius: 8px 8px 0 0;
+      transition: all 0.2s;
+    }
+    .tab-header:hover {
+      color: var(--blue-600);
+      background: var(--blue-50);
+    }
+    .tab-header.active {
+      color: var(--blue-600);
+      background: var(--blue-50);
+      font-weight: 700;
+    }
+    .tab-header .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--red);
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .contract-status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .contract-status-tag.pending { background: var(--amber-bg); color: var(--amber); }
+    .contract-status-tag.sent { background: var(--blue-100); color: var(--blue-700); }
+    .contract-status-tag.signed { background: var(--green-bg); color: var(--green); }
+    .contract-status-tag.rejected { background: var(--red-bg); color: var(--red); }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <partial name="_SidebarPartial" />
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Ký Hợp Đồng</div>
+        <div class="page-sub">Xem xét và ký các hợp đồng booking đã được soạn thảo (Giai đoạn 2)</div>
+      </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+      <div style="background:#F0FDF4; border:1px solid #BBF7D0; color:#168A4A; padding:12px 16px; border-radius:8px; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+        <i class="ti ti-circle-check" style="font-size:18px;"></i> @TempData["SuccessMessage"]
+      </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+      <div style="background:#FEF2F2; border:1px solid #FECACA; color:#D92D20; padding:12px 16px; border-radius:8px; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+        <i class="ti ti-alert-triangle" style="font-size:18px;"></i> @TempData["ErrorMessage"]
+      </div>
+    }
+
+    <!-- TAB NAVIGATION -->
+    <div class="card" style="padding: 16px 20px 0 20px; margin-bottom: 0;">
+      <div class="tab-headers">
+        <div class="tab-header active" onclick="switchTab(event, 'pending')">
+          <i class="ti ti-clock"></i> Chờ Giám đốc ký
+          <span class="badge">@pendingList.Count</span>
+        </div>
+        <div class="tab-header" onclick="switchTab(event, 'signed')">
+          <i class="ti ti-check"></i> Đã ký (Hiệu lực)
+          <span class="badge" style="background:var(--green);">@signedList.Count</span>
+        </div>
+        <div class="tab-header" onclick="switchTab(event, 'rejected')">
+          <i class="ti ti-x"></i> Từ chối
+          <span class="badge" style="background:#94a3b8;">@rejectedList.Count</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: CHỜ KÝ -->
+    <div id="tab-pending" class="tab-content active">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <i class="ti ti-file-text" style="color: var(--amber);"></i> Hợp đồng chờ Giám đốc ký
+          </div>
+          <div style="font-size: 13px; color: var(--muted);">
+            Pháp lý đã duyệt nội dung đúng phiên bản hợp đồng. Giám đốc xem lại và xác nhận ký.
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Client &amp; Chiến dịch</th>
+              <th>KOL/KOC</th>
+              <th>Giá trị Booking</th>
+              <th>Người phụ trách</th>
+              <th>Ngày gửi</th>
+              <th>Trạng thái HĐ</th>
+              <th style="text-align: right;">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (!pendingList.Any())
+            {
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--muted); padding: 30px; font-style: italic;">
+                  Hiện không có Hợp đồng nào đang chờ Giám đốc ký.
+                </td>
+              </tr>
+            }
+            else
+            {
+              foreach (var item in pendingList)
+              {
+                <tr>
+                  <td>
+                    <strong>@item.ClientName</strong><br>
+                    <span style="color:var(--muted); font-size:12px;">Chiến dịch: @(item.Campaign?.Name ?? item.CampaignName)</span>
+                  </td>
+                  <td>@item.KolNames</td>
+                  <td style="color: var(--blue-700); font-weight: 700;">@item.BookingPrice.ToString("N0") đ</td>
+                  <td>@(item.PrimaryManager?.FullName ?? "Nhân viên")</td>
+                  <td>@(item.UpdatedAt?.ToString("dd/MM/yyyy") ?? item.CreatedAt?.ToString("dd/MM/yyyy") ?? "")</td>
+                  <td>
+                    <span class="contract-status-tag pending">
+                      <i class="ti ti-clock"></i> Chờ Giám đốc ký
+                    </span>
+                  </td>
+                  <td style="text-align: right; white-space: nowrap;">
+                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                      <a href="/Bookings/Details/@item.Id" class="btn-mini" style="text-decoration:none;"><i class="ti ti-eye"></i> Xem</a>
+                      @if (!string.IsNullOrEmpty(item.ContractFileUrl))
+                      {
+                        <a href="@item.ContractFileUrl" target="_blank" class="btn-mini" style="text-decoration:none;"><i class="ti ti-file-text"></i> Xem HĐ</a>
+                      }
+                      <form method="post" action="/Bookings/SignContract/@item.Id" style="display:inline;" onsubmit="return confirm('Xác nhận ký hợp đồng đã được Pháp lý duyệt?');">
+                        @Html.AntiForgeryToken()
+                        <label><input type="checkbox" name="confirmed" value="true" required> Xác nhận đã kiểm tra</label><button type="submit" class="btn-mini approve"><i class="ti ti-pen"></i> Xác nhận ký</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Luồng quy trình -->
+      <div class="card" style="margin-top: 20px;">
+        <div class="card-head">
+          <div class="card-title">
+            <i class="ti ti-git-branch" style="color: var(--blue-500);"></i> Luồng duyệt &amp; ký hợp đồng
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 16px 0; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--green-bg); color: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px;"><i class="ti ti-check"></i></div>
+            <div style="font-size: 11px; font-weight: 600; text-align: center; max-width: 80px;">1. Booking<br>đã duyệt</div>
+          </div>
+          <div style="color: var(--muted); font-size: 20px;"><i class="ti ti-arrow-right"></i></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--blue-100); color: var(--blue-700); display: flex; align-items: center; justify-content: center; font-size: 20px;"><i class="ti ti-edit"></i></div>
+            <div style="font-size: 11px; font-weight: 600; text-align: center; max-width: 80px;">2. Soạn/Upload<br>Hợp đồng</div>
+          </div>
+          <div style="color: var(--muted); font-size: 20px;"><i class="ti ti-arrow-right"></i></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><i class="ti ti-shield-check" style="font-size:32px;color:var(--green)"></i><strong style="font-size:11px">3. Pháp lý duyệt</strong></div>
+          <div style="color:var(--muted)"><i class="ti ti-arrow-right"></i></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--amber-bg); color: var(--amber); display: flex; align-items: center; justify-content: center; font-size: 20px; border: 3px solid var(--amber);"><i class="ti ti-pen"></i></div>
+            <div style="font-size: 11px; font-weight: 700; text-align: center; max-width: 80px; color: var(--amber);">4. GĐ Ký HĐ<br>(Bạn ở đây)</div>
+          </div>
+          <div style="color: var(--muted); font-size: 20px;"><i class="ti ti-arrow-right"></i></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--line); color: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 20px;"><i class="ti ti-file-check"></i></div>
+            <div style="font-size: 11px; font-weight: 600; text-align: center; max-width: 80px;">5. Đã ký<br>(Hiệu lực)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ĐÃ KÝ -->
+    <div id="tab-signed" class="tab-content">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <i class="ti ti-file-check" style="color: var(--green);"></i> Lịch sử hợp đồng đã ký
+          </div>
+          <div style="font-size: 13px; color: var(--muted);">
+            Các hợp đồng đã được Giám đốc xác nhận ký và có hiệu lực pháp lý
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Client &amp; Chiến dịch</th>
+              <th>KOL/KOC</th>
+              <th>Giá trị HĐ</th>
+              <th>Người ký</th>
+              <th>Ngày ký</th>
+              <th>Trạng thái</th>
+              <th style="text-align: right;">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (!signedList.Any())
+            {
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--muted); padding: 30px; font-style: italic;">
+                  Chưa có hợp đồng nào đã ký.
+                </td>
+              </tr>
+            }
+            else
+            {
+              foreach (var item in signedList)
+              {
+                <tr>
+                  <td>
+                    <strong>@item.ClientName</strong><br>
+                    <span style="color:var(--muted); font-size:12px;">Chiến dịch: @(item.Campaign?.Name ?? item.CampaignName)</span>
+                  </td>
+                  <td>@item.KolNames</td>
+                  <td style="color: var(--blue-700); font-weight: 700;">@item.BookingPrice.ToString("N0") đ</td>
+                  <td>@(item.ContractSignedBy?.FullName ?? "Giám đốc")</td>
+                  <td>@(item.ContractSignedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</td>
+                  <td>
+                    <span class="contract-status-tag signed">
+                      <i class="ti ti-check"></i> Đã ký (Hiệu lực)
+                    </span>
+                  </td>
+                  <td style="text-align: right; white-space: nowrap;">
+                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                      <a href="/Bookings/Details/@item.Id" class="btn-mini" style="text-decoration:none;"><i class="ti ti-eye"></i> Xem</a>
+                      @if (!string.IsNullOrEmpty(item.ContractFileUrl))
+                      {
+                        <a href="@item.ContractFileUrl" target="_blank" download class="btn-mini" style="text-decoration:none;"><i class="ti ti-file-download"></i> Xem hợp đồng</a>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: TỪ CHỐI -->
+    <div id="tab-rejected" class="tab-content">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <i class="ti ti-file-x" style="color: var(--red);"></i> Hợp đồng / Booking bị từ chối
+          </div>
+          <div style="font-size: 13px; color: var(--muted);">
+            Các đơn phê duyệt booking đã bị từ chối (có thể xem lý do và yêu cầu gửi lại)
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Client &amp; Chiến dịch</th>
+              <th>KOL/KOC</th>
+              <th>Giá trị Booking</th>
+              <th>Lý do từ chối</th>
+              <th>Trạng thái</th>
+              <th style="text-align: right;">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (!rejectedList.Any())
+            {
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--muted); padding: 30px; font-style: italic;">
+                  Không có hợp đồng nào bị từ chối.
+                </td>
+              </tr>
+            }
+            else
+            {
+              foreach (var item in rejectedList)
+              {
+                <tr>
+                  <td>
+                    <strong>@item.ClientName</strong><br>
+                    <span style="color:var(--muted); font-size:12px;">Chiến dịch: @(item.Campaign?.Name ?? item.CampaignName)</span>
+                  </td>
+                  <td>@item.KolNames</td>
+                  <td style="color: var(--blue-700); font-weight: 700;">@item.BookingPrice.ToString("N0") đ</td>
+                  <td style="color: var(--red); font-weight:600;">@(string.IsNullOrWhiteSpace(item.RejectionReason) ? "Không ghi lý do" : item.RejectionReason)</td>
+                  <td>
+                    <span class="contract-status-tag rejected">
+                      <i class="ti ti-x"></i> Từ chối
+                    </span>
+                  </td>
+                  <td style="text-align: right;">
+                    <a href="/Bookings/Details/@item.Id" class="btn-mini" style="text-decoration:none;"><i class="ti ti-eye"></i> Xem chi tiết</a>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  function switchTab(event, tabId) {
+    const headers = document.querySelectorAll('.tab-header');
+    headers.forEach(h => h.classList.remove('active'));
+    event.target.closest('.tab-header').classList.add('active');
+
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+  }
+</script>
+</body>
+</html>

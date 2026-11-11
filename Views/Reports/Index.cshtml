@@ -1,0 +1,165 @@
+@model HanaMedia.ViewModels.ReportPageViewModel
+@using HanaMedia.ViewModels
+@{
+  string Money(decimal value) => $"{value:N0} đ";
+  string ReportTitle() => Model.ReportType switch { ReportTypes.Booking => "Báo cáo Booking", ReportTypes.Ideas => "Báo cáo Ý tưởng", _ => "Báo cáo Nhân sự" };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — @ReportTitle()</title>
+  <link rel="stylesheet" href="~/css/design-system.css"><link rel="stylesheet" href="~/css/layout.css"><link rel="stylesheet" href="~/css/components.css">
+</head>
+<body><div class="layout"><partial name="_SidebarPartial" />
+<main class="main">
+  <div class="topbar"><div><div class="page-title">@ReportTitle()</div><div class="page-sub">Dữ liệu tổng hợp từ hệ thống · @Model.PeriodLabel @(Model.IsLimited ? "· Quyền xem giới hạn" : "")</div></div>
+    <div class="topbar-actions"><a class="icon-btn" title="Xuất CSV" aria-label="Xuất báo cáo CSV" href="/Reports/Export?type=@Model.ReportType&period=@Model.Period"><i class="ti ti-download"></i></a></div>
+  </div>
+
+  @if (Model.IsDirector)
+  {
+    <nav class="report-tabs card" aria-label="Loại báo cáo">
+      <a class="@(Model.ReportType == ReportTypes.HumanResources ? "active" : null)" href="/Reports?type=human_resources&period=@Model.Period">Nhân sự</a>
+      <a class="@(Model.ReportType == ReportTypes.Booking ? "active" : null)" href="/Reports?type=booking&period=@Model.Period">Booking</a>
+      <a class="@(Model.ReportType == ReportTypes.Ideas ? "active" : null)" href="/Reports?type=ideas&period=@Model.Period">Ý tưởng</a>
+    </nav>
+  }
+  <nav class="period-tabs report-periods" aria-label="Kỳ báo cáo">
+    <a class="period-tab @(Model.Period == "day" ? "active" : null)" href="/Reports?type=@Model.ReportType&period=day">Ngày</a>
+    <a class="period-tab @(Model.Period == "month" ? "active" : null)" href="/Reports?type=@Model.ReportType&period=month">Tháng</a>
+    <a class="period-tab @(Model.Period == "quarter" ? "active" : null)" href="/Reports?type=@Model.ReportType&period=quarter">Quý</a>
+  </nav>
+
+  @if (Model.HumanResources is { } hr)
+  {
+    <div class="kpi-grid report-kpis">
+      <div class="kpi-card"><div class="kpi-label">Tổng nhân sự</div><div class="kpi-value">@hr.TotalEmployees</div></div>
+    </div>
+    <div class="grid-2 report-grid"><partial name="_ReportBreakdown" model='("Nhân sự theo phòng ban", hr.Departments)' /><partial name="_ReportBreakdown" model='("Loại hợp đồng", hr.ContractTypes)' /></div>
+    @if (!Model.IsLimited)
+    {
+      <div class="card report-card"><div class="card-head"><div><div class="card-title">Hiệu suất nhân viên</div><div class="card-sub">Tính theo task có deadline trong kỳ</div></div></div><div class="table-scroll"><table><thead><tr><th>ID</th><th>Nhân sự</th><th>Phòng ban</th><th>Tổng task</th><th>Hoàn thành</th><th>Quá hạn</th><th>Hiệu suất</th></tr></thead><tbody>
+      @if (hr.EmployeePerformance.Count == 0) { <tr><td colspan="7" class="empty-cell">Chưa có dữ liệu task trong kỳ.</td></tr> }
+      else { @foreach (var row in hr.EmployeePerformance) { <tr><td>#@row.EmployeeId</td><td><strong>@row.EmployeeName</strong></td><td>@row.DepartmentName</td><td>@row.TotalTasks</td><td>@row.CompletedTasks</td><td>@row.OverdueTasks</td><td><strong>@row.CompletionRate%</strong></td></tr> } }
+      </tbody></table></div></div>
+    }
+  }
+
+  @if (Model.Booking is { } booking)
+  {
+    <div class="kpi-grid report-kpis">
+      <div class="kpi-card"><div class="kpi-label">Tổng booking</div><div class="kpi-value">@booking.TotalBookings</div></div>
+      <div class="kpi-card"><div class="kpi-label">Hoàn thành</div><div class="kpi-value metric-good">@booking.CompletedBookings</div></div>
+      <div class="kpi-card"><div class="kpi-label">Quá hạn</div><div class="kpi-value metric-bad">@booking.OverdueBookings</div></div>
+      @if (Model.IsLimited) { <div class="kpi-card"><div class="kpi-label">Thu lao cua toi</div><div class="kpi-value money">@Money(booking.MyWage)</div></div> }
+      else { <div class="kpi-card"><div class="kpi-label">Doanh thu thực thu</div><div class="kpi-value money">@Money(booking.Revenue)</div></div><div class="kpi-card"><div class="kpi-label">Chi phi</div><div class="kpi-value money">@Money(booking.Cost)</div></div><div class="kpi-card"><div class="kpi-label">Loi nhuan</div><div class="kpi-value money metric-good">@Money(booking.Profit)</div></div> }
+    </div>
+
+    @if (!Model.IsLimited)
+    {
+      @* ===== PHAN BO TAI CHINH 50/10/40 ===== *@
+      <div class="finance-breakdown-section">
+        <div class="card-head"><div class="card-title">PHAN BO TAI CHINH 50/10/40</div><div class="card-sub">Tinh theo kỳ @Model.PeriodLabel</div></div>
+        <div class="finance-split-grid">
+          <div class="finance-split-cell company">
+            <div class="finance-split-label"><i class="ti ti-building-bank"></i> Cong ty (lanh dao)</div>
+            <div class="finance-split-pct">@Math.Round(booking.CompanyPercent, 0)%</div>
+            <div class="finance-split-money">@Money(booking.TotalCompanyShare)</div>
+            <div class="finance-split-bar"><div class="finance-bar-fill company" style="width:@Math.Round(booking.CompanyPercent)%"></div></div>
+          </div>
+          <div class="finance-split-cell manager">
+            <div class="finance-split-label"><i class="ti ti-user-shield"></i> Quan ly booking</div>
+            <div class="finance-split-pct">@Math.Round(booking.ManagerPercent, 0)%</div>
+            <div class="finance-split-money">@Money(booking.TotalManagerShare)</div>
+            <div class="finance-split-bar"><div class="finance-bar-fill manager" style="width:@Math.Round(booking.ManagerPercent)%"></div></div>
+          </div>
+          <div class="finance-split-cell kol">
+            <div class="finance-split-label"><i class="ti ti-users-group"></i> KOL / KOC</div>
+            <div class="finance-split-pct">@Math.Round(booking.KolPercent, 0)%</div>
+            <div class="finance-split-money">@Money(booking.TotalKolShare)</div>
+            <div class="finance-split-bar"><div class="finance-bar-fill kol" style="width:@Math.Round(booking.KolPercent)%"></div></div>
+          </div>
+        </div>
+        @if (booking.ManagerShares.Count > 0)
+        {
+          <div class="finance-detail-section">
+            <div class="finance-detail-title"><i class="ti ti-user-shield"></i> Chi tiet theo quan ly</div>
+            <table class="report-mini-table">
+              <thead><tr><th>#</th><th>Quan ly</th><th>So booking</th><th>Tong hoa hong</th></tr></thead>
+              <tbody>
+                @{
+                  var mi = 0;
+                  foreach (var m in booking.ManagerShares)
+                  { mi++; <tr><td>@mi</td><td><strong>@m.ManagerName</strong></td><td>@m.BookingCount</td><td class="money-cell">@Money(m.TotalCommission)</td></tr> }
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (booking.KolShares.Count > 0)
+        {
+          <div class="finance-detail-section">
+            <div class="finance-detail-title"><i class="ti ti-user-star"></i> Chi tiet theo KOL / KOC</div>
+            <table class="report-mini-table">
+              <thead><tr><th>#</th><th>KOL / KOC</th><th>Nen tang</th><th>So booking</th><th>Tong cat-xe</th></tr></thead>
+              <tbody>
+                @{
+                  var ki = 0;
+                  foreach (var k in booking.KolShares)
+                  { ki++; <tr><td>@ki</td><td><strong>@k.KolName</strong></td><td><span class="platform-chip">@k.Platform</span></td><td>@k.BookingCount</td><td class="money-cell">@Money(k.TotalCast)</td></tr> }
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <div class="report-card"><partial name="_ReportBreakdown" model='("Booking theo trang thai", booking.Statuses)' /></div>
+      <div class="card report-card"><div class="card-head"><div class="card-title">Booking đã nghiệm thu — theo ngày khách thanh toán</div></div><div class="table-scroll"><table><thead><tr><th>ID</th><th>Client &amp; chien dich</th><th>KOL/KOC</th><th>Trang thai</th><th>Deadline</th><th>Doanh thu</th><th>Cong ty @booking.CompanyPercent%</th><th>QL @booking.ManagerPercent%</th><th>KOL @booking.KolPercent%</th></tr></thead><tbody>
+      @if (booking.Rows.Count == 0) { <tr><td colspan="9" class="empty-cell">Chua co booking trong ky.</td></tr> }
+      else { @foreach(var row in booking.Rows){<tr><td>#@row.Id</td><td><strong>@row.ClientCampaign</strong></td><td>@row.KolName</td><td>@row.StatusLabel</td><td>@row.Deadline.ToString("dd/MM/yyyy")</td><td class="money-cell">@Money(row.Revenue)</td><td class="money-cell company-cell">@Money(row.CompanyShare)</td><td class="money-cell manager-cell">@Money(row.ManagerShare)</td><td class="money-cell kol-cell">@Money(row.KolShareTotal)</td></tr>} }
+      </tbody></table></div></div>
+    }
+  }
+
+  @if (Model.Ideas is { } ideas)
+  {
+    <div class="kpi-grid report-kpis"><div class="kpi-card"><div class="kpi-label">Tổng ý tưởng</div><div class="kpi-value">@ideas.TotalIdeas</div></div><div class="kpi-card"><div class="kpi-label">Đã duyệt</div><div class="kpi-value metric-good">@ideas.ApprovedIdeas</div></div><div class="kpi-card"><div class="kpi-label">Cần chỉnh sửa</div><div class="kpi-value metric-bad">@ideas.RevisionIdeas</div></div><div class="kpi-card"><div class="kpi-label">Chờ duyệt</div><div class="kpi-value">@ideas.PendingIdeas</div></div><div class="kpi-card"><div class="kpi-label">Tỷ lệ duyệt</div><div class="kpi-value">@ideas.ApprovalRate%</div></div></div>
+    <div class="report-card"><partial name="_ReportBreakdown" model='("Ý tưởng theo trạng thái", ideas.Statuses)' /></div>
+    @if (!Model.IsLimited && ideas.EmployeePerformance.Count > 0)
+    {
+      <div class="card report-card"><div class="card-head"><div class="card-title">Hiệu suất nhân sự Ý tưởng</div></div><div class="table-scroll"><table><thead><tr><th>Nhân sự</th><th>Tổng ý tưởng</th><th>Đã duyệt</th><th>Cần sửa</th><th>Tỷ lệ duyệt</th></tr></thead><tbody>@foreach(var row in ideas.EmployeePerformance){<tr><td><strong>@row.EmployeeName</strong></td><td>@row.TotalIdeas</td><td>@row.ApprovedIdeas</td><td>@row.RevisionIdeas</td><td>@row.ApprovalRate%</td></tr>}</tbody></table></div></div>
+    }
+    <div class="card report-card"><div class="card-head"><div class="card-title">Chi tiết ý tưởng</div></div><div class="table-scroll"><table><thead><tr><th>ID</th><th>Ý tưởng</th><th>Client &amp; chiến dịch</th><th>Phụ trách</th><th>Trạng thái</th><th>Giám đốc</th><th>Deadline</th></tr></thead><tbody>
+    @if(ideas.Rows.Count==0){<tr><td colspan="7" class="empty-cell">Chưa có ý tưởng trong kỳ.</td></tr>}else{@foreach(var row in ideas.Rows){<tr><td>#@row.Id</td><td><strong>@row.Title</strong></td><td>@row.ClientCampaign</td><td>@row.OwnerName</td><td>@row.StatusLabel</td><td>@row.DirectorStatusLabel</td><td>@row.Deadline.ToString("dd/MM/yyyy")</td></tr>}}
+    </tbody></table></div></div>
+  }
+</main></div>
+<style>
+ .report-tabs{display:flex;gap:8px;padding:10px;margin-bottom:14px}.report-tabs a{padding:9px 16px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:600}.report-tabs a.active{background:var(--blue-100);color:var(--blue-700)}.report-periods{margin-bottom:18px}.report-periods a{text-decoration:none}.report-kpis{margin-bottom:18px}.report-grid{margin:0 0 18px}.report-card{margin:0 0 18px}.money{font-size:23px}.metric-good{color:var(--green)!important}.metric-bad{color:var(--red)!important}.table-scroll{overflow-x:auto}.empty-cell{text-align:center!important;color:var(--muted);padding:24px!important}.money-cell{font-weight:600;text-align:right}.company-cell{color:#4338CA!important}.manager-cell{color:#B45309!important}.kol-cell{color:#166534!important}
+ .finance-breakdown-section{margin:0 0 18px;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+ .finance-breakdown-section .card-head{padding:16px 20px 12px;border-bottom:1px solid var(--border)}
+ .finance-breakdown-section .card-title{font-size:15px;font-weight:700;color:var(--text)}
+ .finance-breakdown-section .card-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+ .finance-split-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+ .finance-split-cell{padding:16px 20px;display:flex;flex-direction:column;gap:6px}
+ .finance-split-cell.company{background:linear-gradient(135deg,#eef2ff,#e0e7ff)}
+ .finance-split-cell.manager{background:linear-gradient(135deg,#fef3c7,#fde68a)}
+ .finance-split-cell.kol{background:linear-gradient(135deg,#dcfce7,#bbf7d0)}
+ .finance-split-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;display:flex;align-items:center;gap:6px}
+ .finance-split-pct{font-size:11px;font-weight:600;color:var(--muted);background:rgba(255,255,255,0.6);padding:2px 8px;border-radius:999px;align-self:flex-start}
+ .finance-split-money{font-size:18px;font-weight:700;color:var(--text)}
+ .finance-split-bar{height:6px;background:rgba(255,255,255,0.5);border-radius:999px;overflow:hidden}
+ .finance-bar-fill{height:100%;border-radius:999px}
+ .finance-bar-fill.company{background:#4338CA}
+ .finance-bar-fill.manager{background:#B45309}
+ .finance-bar-fill.kol{background:#166534}
+ .finance-detail-section{padding:14px 20px;border-top:1px solid var(--border)}
+ .finance-detail-title{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+ .report-mini-table{width:100%;border-collapse:collapse;font-size:13.5px}
+ .report-mini-table th{background:#f8fafc;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
+ .report-mini-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+ .report-mini-table tr:last-child td{border-bottom:none}
+ .platform-chip{font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;font-weight:500}
+</style></body></html>

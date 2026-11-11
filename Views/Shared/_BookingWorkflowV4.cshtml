@@ -1,0 +1,20 @@
+@model HanaMedia.Models.Booking
+@using HanaMedia.Constants
+@{ var owner = ViewBag.IsWritable == true; var director = User.IsInRole(AppRoles.Director); }
+<section class="enterprise-card">
+ <h2 class="card-title-text">TIẾN ĐỘ BOOKING</h2>
+ <p class="card-subtitle-text">Chờ → Giám đốc duyệt → Đang chạy → Hoàn thành → Đã nghiệm thu</p>
+ <p><strong>@Model.WorkflowLabel</strong></p>
+ @if(!string.IsNullOrWhiteSpace(Model.RejectionReason)){<p>Yêu cầu chỉnh sửa: @Model.RejectionReason</p>}
+ @if(owner && Model.Status != "huy" && Model.ContractStatus is "nhap" or "tu_choi"){
+  <form action="/Bookings/SubmitApproval/@Model.Id" method="post">@Html.AntiForgeryToken()<button class="btn-mini approve">Gửi Giám đốc duyệt</button></form>
+ }
+ @if(director && Model.Status != "huy" && Model.ContractStatus == "cho_duyet"){
+  <form action="/Bookings/Approve/@Model.Id" method="post">@Html.AntiForgeryToken()<button class="btn-mini approve">Duyệt Booking</button></form>
+  <form action="/Bookings/Reject/@Model.Id" method="post">@Html.AntiForgeryToken()<label>Lý do trả sửa<input class="form-control" name="rejectionReason" required maxlength="1000"></label><button class="btn-mini">Trả sửa</button></form>
+ }
+ @if(owner && Model.WorkflowStatus == "da_duyet"){
+  <form action="/Bookings/Start/@Model.Id" method="post">@Html.AntiForgeryToken()<button class="btn-mini approve">Bắt đầu chạy</button></form>
+ }
+ <p class="card-subtitle-text">Pháp chế soạn và chuyển hợp đồng; Booking nhận để xem hoặc tải tài liệu. Sau khi hoàn thành, người phụ trách xác nhận đã nhận đủ tiền khách để chuyển sang Đã nghiệm thu. Hạn thu là 1 tháng kể từ ngày báo hoàn thành.</p>
+</section>

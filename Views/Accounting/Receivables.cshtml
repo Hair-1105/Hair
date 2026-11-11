@@ -1,0 +1,24 @@
+@model List<HanaMedia.Models.Booking>
+@{ Layout = "_OperationsLayout"; ViewData["Title"] = "Công nợ & hạn thu"; ViewData["Subtitle"] = "Theo dõi khoản cần thu sau khi Booking báo hoàn thành."; }
+<section class="ops-metrics" aria-label="Tổng quan công nợ">
+  <div class="kpi-card"><div class="kpi-label">Tổng chưa thu</div><div class="kpi-value">@(((decimal)ViewBag.TotalOutstanding).ToString("N0")) đ</div><div class="kpi-note">Booking hoàn thành, chưa nhận đủ tiền</div></div>
+  <div class="kpi-card"><div class="kpi-label">Đã quá hạn</div><div class="kpi-value">@(((decimal)ViewBag.TotalOverdue).ToString("N0")) đ</div><div class="kpi-note"><a class="ops-link" href="/Accounting/Receivables?status=overdue">Xem khoản quá hạn</a></div></div>
+  <div class="kpi-card"><div class="kpi-label">Đến hạn trong 7 ngày</div><div class="kpi-value">@(((decimal)ViewBag.TotalDueSoon).ToString("N0")) đ</div><div class="kpi-note"><a class="ops-link" href="/Accounting/Receivables?status=soon">@ViewBag.DueSoonCount Booking · gồm hôm nay</a></div></div>
+</section>
+<section class="card ops-card">
+  <div class="card-head"><div><h2 class="card-title">Danh sách cần thu</h2><p class="card-sub">Hạn thu: 1 tháng lịch từ ngày hoàn thành. Thống kê phía trên tính trên toàn bộ công nợ.</p></div><span class="ops-badge neutral">@Model.Count Booking</span></div>
+  <form method="get" class="ops-filters"><label>Tình trạng<select name="status">
+    <option value="">Tất cả chưa thu</option><option value="overdue" selected="@(ViewBag.Status == "overdue")">Quá hạn</option><option value="soon" selected="@(ViewBag.Status == "soon")">Đến hạn trong 7 ngày</option><option value="today" selected="@(ViewBag.Status == "today")">Đến hạn hôm nay</option><option value="upcoming" selected="@(ViewBag.Status == "upcoming")">Chưa đến hạn</option><option value="unknown" selected="@(ViewBag.Status == "unknown")">Thiếu ngày hoàn thành</option>
+  </select></label><button class="ops-button primary">Lọc danh sách</button></form>
+  <div class="ops-table-wrap"><table class="ops-table wide"><thead><tr><th scope="col">Booking / Đối tác</th><th scope="col">Phụ trách</th><th scope="col">Hoàn thành</th><th scope="col">Hạn thu</th><th scope="col" class="ops-num">Chưa thu</th><th scope="col">Tình trạng</th></tr></thead><tbody>
+  @foreach (var b in Model)
+  {
+    var due = b.CollectionDueDate;
+    var badge = due == null ? "neutral" : due < DateTime.Today ? "danger" : due <= DateTime.Today.AddDays(7) ? "warning" : "success";
+    var label = due == null ? "Thiếu ngày hoàn thành" : due < DateTime.Today ? $"Quá hạn {(DateTime.Today - due.Value).Days} ngày" : due == DateTime.Today ? "Đến hạn hôm nay" : $"Còn {(due.Value - DateTime.Today).Days} ngày";
+    <tr><td><a class="ops-name" href="/Bookings/Details/@b.Id">#@b.Id — @b.CampaignName</a><span class="ops-sub">@b.ClientName</span></td><td>@(b.PrimaryManager?.FullName ?? "Chưa phân công")</td><td class="ops-date">@(b.CompletedAt?.ToString("dd/MM/yyyy") ?? "Chưa có dữ liệu")</td><td class="ops-date">@(due?.ToString("dd/MM/yyyy") ?? "Chưa xác định")</td><td class="ops-num">@b.BookingPrice.ToString("N0") đ</td><td><span class="ops-badge @badge">@label</span></td></tr>
+  }
+  @if (Model.Count == 0) { <tr><td colspan="6" class="ops-empty">Không có công nợ phù hợp với bộ lọc.</td></tr> }
+  </tbody></table></div>
+</section>
+<p class="ops-muted">Số tiền chưa thu là toàn bộ giá trị Booking cho đến khi người phụ trách xác nhận nhận đủ tiền. Hồ sơ cũ chưa có ngày hoàn thành được tách riêng để đối chiếu.</p>

@@ -1,0 +1,158 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace HanaMedia.ViewModels;
+
+public sealed class AccountManagementPageViewModel
+{
+    public IReadOnlyList<AccountListItemViewModel> Accounts { get; init; } = [];
+
+    public IReadOnlyList<EmployeeOptionViewModel> EligibleEmployees { get; init; } = [];
+
+    public IReadOnlyList<RoleOptionViewModel> Roles { get; init; } = [];
+
+    public string? Search { get; init; }
+
+    public string? SuccessMessage { get; set; }
+
+    public string? ErrorMessage { get; set; }
+
+    public string? TemporaryPassword { get; set; }
+
+    public string? TemporaryPasswordUsername { get; set; }
+}
+
+public sealed class AccountListItemViewModel
+{
+    public int Id { get; init; }
+
+    public string Username { get; init; } = string.Empty;
+
+    public string Email { get; init; } = string.Empty;
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string RoleCode { get; init; } = string.Empty;
+
+    public string RoleName { get; init; } = string.Empty;
+
+    public string Status { get; init; } = string.Empty;
+
+    public int FailedLoginAttempts { get; init; }
+
+    public DateTime? LockedUntil { get; init; }
+
+    public bool IsTemporarilyLocked { get; init; }
+
+    public int TemporaryLockMinutesRemaining { get; init; }
+
+    public string SecurityStamp { get; init; } = string.Empty;
+
+    public DateTime? LastLoginAt { get; init; }
+
+    public string? LastLoginIp { get; init; }
+
+    public bool IsCurrentAccount { get; init; }
+
+    public bool CanLock { get; init; }
+
+    public bool CanChangeRole { get; init; }
+}
+
+public sealed class EmployeeOptionViewModel
+{
+    public int Id { get; init; }
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string Email { get; init; } = string.Empty;
+
+    public string SuggestedUsername { get; init; } = string.Empty;
+}
+
+public sealed record RoleOptionViewModel(string Code, string Name);
+
+public sealed class CreateAccountInputModel
+{
+    [Required(ErrorMessage = "Vui lòng nhập tên đăng nhập.")]
+    [StringLength(50, MinimumLength = 3, ErrorMessage = "Tên đăng nhập phải dài từ 3 đến 50 ký tự.")]
+    [RegularExpression("^[A-Za-z0-9._-]+$", ErrorMessage = "Tên đăng nhập chỉ được gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.")]
+    public string Username { get; set; } = string.Empty;
+
+    [Range(1, int.MaxValue, ErrorMessage = "Vui lòng chọn nhân viên cần cấp tài khoản.")]
+    public int EmployeeId { get; set; }
+
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu khởi tạo.")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Mật khẩu khởi tạo phải có ít nhất 8 ký tự.")]
+    public string InitialPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
+    public string Role { get; set; } = string.Empty;
+}
+
+public sealed class ChangeRoleInputModel
+{
+    [Range(1, int.MaxValue, ErrorMessage = "Mã tài khoản không hợp lệ.")]
+    public int UserId { get; set; }
+
+    [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
+    public string Role { get; set; } = string.Empty;
+
+    public string ExpectedSecurityStamp { get; set; } = string.Empty;
+}
+
+public sealed class AccountStatusInputModel
+{
+    [Range(1, int.MaxValue, ErrorMessage = "Mã tài khoản không hợp lệ.")]
+    public int UserId { get; set; }
+
+    [Required(ErrorMessage = "Trạng thái tài khoản không hợp lệ.")]
+    public string Status { get; set; } = string.Empty;
+
+    public string ExpectedSecurityStamp { get; set; } = string.Empty;
+}
+
+public sealed class AccountIdInputModel
+{
+    [Range(1, int.MaxValue, ErrorMessage = "Mã tài khoản không hợp lệ.")]
+    public int UserId { get; set; }
+
+    public string ExpectedSecurityStamp { get; set; } = string.Empty;
+}
+
+public sealed class LoginHistoryResponseViewModel
+{
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string Username { get; init; } = string.Empty;
+
+    public int CurrentPage { get; init; }
+
+    public int TotalPages { get; init; }
+
+    public int TotalCount { get; init; }
+
+    public int PageSize { get; init; }
+
+    public IReadOnlyList<LoginHistoryItemViewModel> Items { get; init; } = [];
+}
+
+public sealed class LoginHistoryItemViewModel
+{
+    public string OccurredAt { get; init; } = string.Empty;
+
+    public string Action { get; init; } = string.Empty;
+
+    public string Label { get; init; } = string.Empty;
+
+    public string IpAddress { get; init; } = string.Empty;
+
+    public string DeviceInfo { get; init; } = string.Empty;
+
+    public string Detail { get; init; } = string.Empty;
+}
+
+public sealed record AccountOperationResult(
+    bool Succeeded,
+    string Message,
+    string? TemporaryPassword = null,
+    string? Username = null);

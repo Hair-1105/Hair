@@ -1,0 +1,46 @@
+@model HanaMedia.ViewModels.CompanyDashboardViewModel
+@{
+  var dashboardViewData = new ViewDataDictionary(ViewData)
+  {
+    ["DashboardPath"] = "/Director/Dashboard",
+    ["PeriodQueryName"] = "period",
+    ["ReadOnly"] = false
+  };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Dashboard tổng công ty</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+</head>
+<body>
+<div class="layout">
+  <partial name="_SidebarPartial" />
+  <main class="main">
+    <div class="topbar"><div><div class="page-title">Dashboard tổng công ty</div><div class="page-sub">Toàn cảnh nhân sự, booking, chiến dịch, ý tưởng và tiến độ công việc</div></div></div>
+    <partial name="_CompanyDashboardSummary" model="Model" view-data="dashboardViewData" />
+    <section class="card" style="padding:24px;margin-top:24px">
+      <h3>Doanh thu theo tháng — 12 tháng gần nhất</h3>
+      <p class="muted">Giá trị Booking tính theo ngày ghi nhận Booking, không gồm Booking đã hủy. Tiền khách đã thanh toán tính theo ngày thanh toán thực tế, không phải lợi nhuận công ty.</p>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr><th style="text-align:left;padding:12px">Tháng</th><th style="text-align:right;padding:12px">Giá trị Booking (VNĐ)</th><th style="text-align:right;padding:12px">Khách đã thanh toán (VNĐ)</th></tr></thead>
+          <tbody>
+          @foreach (var row in Model.MonthlyRevenue.Reverse())
+          {
+            <tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">@row.Month.ToString("MM/yyyy")</td><td style="text-align:right;padding:12px">@row.BookingValue.ToString("N0")</td><td style="text-align:right;padding:12px">@row.CustomerReceipts.ToString("N0")</td></tr>
+          }
+          </tbody>
+          <tfoot><tr style="font-weight:700;border-top:2px solid #e2e8f0"><td style="padding:12px">Tổng 12 tháng</td><td style="text-align:right;padding:12px">@Model.MonthlyRevenue.Sum(r => r.BookingValue).ToString("N0")</td><td style="text-align:right;padding:12px">@Model.MonthlyRevenue.Sum(r => r.CustomerReceipts).ToString("N0")</td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

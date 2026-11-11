@@ -1,0 +1,17 @@
+@model List<HanaMedia.Models.LegalDocument>
+@using HanaMedia.Models
+@using HanaMedia.Constants
+@{ Layout = "_OperationsLayout"; var legal = User.IsInRole(AppRoles.LegalStaff); string kind = ViewBag.Kind ?? ""; string createKind = kind is "employment" or "policy" ? kind : "booking"; ViewData["Title"] = legal ? (kind == "" ? "Hồ sơ Pháp chế" : LegalDocument.KindLabel(kind)) : "Hợp đồng từ Pháp chế"; ViewData["Subtitle"] = legal ? "Quản lý bản soạn, tài liệu đính kèm và hợp đồng đã chuyển Booking." : "Hợp đồng Pháp chế đã chuyển để bạn xem và tải tài liệu."; }
+@section PageActions { @if (legal) { <a class="ops-button primary" href="/LegalDocuments/Edit?kind=@createKind&bookingId=@ViewBag.BookingId"><i class="ti ti-plus" aria-hidden="true"></i> Soạn hồ sơ</a> } }
+<section class="card ops-card">
+  <div class="card-head"><h2 class="card-title">Danh sách hồ sơ @(ViewBag.BookingId == null ? "" : $"— Booking #{ViewBag.BookingId}")</h2><span class="ops-badge neutral">@Model.Count hồ sơ</span></div>
+  @if (legal) {
+    <form method="get" class="ops-filters"><input type="hidden" name="bookingId" value="@ViewBag.BookingId"><label>Loại hồ sơ<select name="kind"><option value="">Tất cả</option>@foreach (var k in new[] { "booking", "employment", "policy" }) { <option value="@k" selected="@(kind == k)">@LegalDocument.KindLabel(k)</option> }</select></label><button class="ops-button primary">Lọc danh sách</button>@if (ViewBag.BookingId != null) { <a class="ops-button" href="/LegalDocuments?kind=@kind">Xem tất cả Booking</a> }</form>
+  }
+  <div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Hồ sơ / Loại tài liệu</th><th>Booking / Nhân viên</th><th>Trạng thái</th><th>Cập nhật</th></tr></thead><tbody>
+  @foreach (var d in Model) {
+    <tr><td><a class="ops-name" href="/LegalDocuments/Details/@d.Id">@d.Title</a><span class="ops-sub">@LegalDocument.KindLabel(d.Kind) · Phiên bản @d.Revision</span></td><td>@(d.Booking != null ? $"#{d.BookingId} — {d.Booking.CampaignName}" : d.Employee?.FullName ?? "Toàn công ty")</td><td><span class="ops-badge @(d.SentAt != null || d.Kind != "booking" ? "success" : "warning")">@(d.SentAt != null ? "Đã chuyển Booking" : d.Kind == "booking" ? "Bản soạn chưa gửi" : "Đã lưu")</span></td><td class="ops-date">@d.UpdatedAt.ToString("dd/MM/yyyy")<span class="ops-sub">@d.UpdatedAt.ToString("HH:mm")</span></td></tr>
+  }
+  @if (Model.Count == 0) { <tr><td colspan="4" class="ops-empty">Chưa có hồ sơ phù hợp.</td></tr> }
+  </tbody></table></div>
+</section>

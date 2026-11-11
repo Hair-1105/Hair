@@ -1,0 +1,18 @@
+@model HanaMedia.Models.LegalDocument
+@using HanaMedia.Models
+@using HanaMedia.Constants
+@{ Layout = "_OperationsLayout"; ViewData["Title"] = Model.Title; ViewData["Subtitle"] = LegalDocument.KindLabel(Model.Kind); var legal = User.IsInRole(AppRoles.LegalStaff); }
+@section PageActions { <a class="ops-button" href="/LegalDocuments?kind=@Model.Kind&bookingId=@Model.BookingId">← Danh sách hồ sơ</a> }
+@if (Model.SentAt != null) { <div class="ops-notice success">Đã chuyển Booking lúc @Model.SentAt.Value.ToString("dd/MM/yyyy HH:mm"). Bản đã gửi được giữ nguyên để đối chiếu.</div> }
+<div class="ops-editor">
+<section class="card ops-card"><div class="card-head"><h2 class="card-title">Nội dung tài liệu</h2><span class="ops-badge @(Model.SentAt != null || Model.Kind != "booking" ? "success" : "warning")">@(Model.SentAt != null ? "Đã chuyển Booking" : Model.Kind == "booking" ? "Bản soạn chưa gửi" : "Đã lưu")</span></div>
+  @if (Model.AttachmentName != null) { <p><a class="ops-button" href="/LegalDocuments/Attachment/@Model.Id"><i class="ti ti-download" aria-hidden="true"></i> @Model.AttachmentOriginalName</a></p> }
+  <div class="ops-document">@(string.IsNullOrWhiteSpace(Model.Content) ? "Nội dung được lưu trong tệp đính kèm." : Model.Content)</div>
+  @if (legal && Model.SentAt == null) { <div class="ops-form-footer"><a class="ops-button" href="/LegalDocuments/Edit/@Model.Id">Chỉnh sửa</a>@if (Model.Kind == "booking") { <form method="post" action="/LegalDocuments/Send/@Model.Id">@Html.AntiForgeryToken()<input type="hidden" name="revision" value="@Model.Revision"><button class="ops-button primary" type="submit">Chuyển cho Booking</button></form> }</div> }
+  @if (legal && Model.SentAt != null) { <div class="ops-form-footer"><a class="ops-button" href="/LegalDocuments/Edit?kind=booking&bookingId=@Model.BookingId">Soạn hợp đồng bổ sung</a></div> }
+</section>
+<aside class="card"><h2 class="card-title">Thông tin hồ sơ</h2><dl class="ops-meta"><div><dt>Phiên bản</dt><dd>@Model.Revision</dd></div><div><dt>Cập nhật</dt><dd>@Model.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</dd></div>
+@if (Model.Booking != null) { <div><dt>Booking</dt><dd>#@Model.BookingId — @Model.Booking.CampaignName<br>@Model.Booking.ClientName</dd></div> }
+@if (Model.Employee != null) { <div><dt>Nhân viên</dt><dd>@Model.Employee.FullName</dd></div> }
+</dl></aside>
+</div>

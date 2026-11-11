@@ -1,0 +1,694 @@
+﻿@model HanaMedia.Models.ViewModels.BookingCampaignViewModel
+@{
+    Layout = null;
+}
+@functions {
+    public string GetStatusChipClass(string? status) => status switch
+    {
+        "dang_cho" => "status-warn",
+        "thuong_luong" => "status-info",
+        "da_chot" => "status-good",
+        "dang_trien_khai" => "status-good",
+        "hoan_thanh" => "status-good",
+        "huy" => "status-bad",
+        _ => "status-info"
+    };
+
+    public string GetStatusText(string? status) => status switch
+    {
+        "dang_cho" => "Đang chờ",
+        "thuong_luong" => "Đang thương lượng",
+        "da_chot" => "Đã chốt",
+        "dang_trien_khai" => "Đang triển khai",
+        "hoan_thanh" => "Hoàn thành",
+        "huy" => "Đã hủy",
+        _ => status ?? "N/A"
+    };
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia - Giám sát Booking & Thù lao (Giam doc)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+  <link rel="stylesheet" href="~/css/disbursement.css" asp-append-version="true">
+  <style>
+    .tab-headers {
+      display: flex;
+      gap: 16px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+      margin-bottom: 18px;
+    }
+    .tab-header {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 6px 14px;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab-header:hover {
+      color: var(--blue-500);
+    }
+    .tab-header.active {
+      color: var(--blue-500);
+      font-weight: 700;
+    }
+    .tab-header.active::after {
+      content: '';
+      position: absolute;
+      bottom: -9px;
+      left: 0; right: 0;
+      height: 3px;
+      background: var(--blue-500);
+      border-radius: 2px 2px 0 0;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    .btn-action-view {
+      color: var(--blue-700);
+      border-color: rgba(11, 58, 110, 0.15);
+      background: #EFF6FF;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      text-decoration: none;
+    }
+    .btn-action-view:hover {
+      background: #DBEAFE;
+      color: #1D4ED8;
+    }
+
+    .pagination-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #E4E9F0;
+    }
+    .pagination-info {
+      font-size: 12.5px;
+      color: #6B7A90;
+      font-weight: 500;
+    }
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .page-btn {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFFFFF;
+      color: #172B4D;
+      border: 1px solid #E4E9F0;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .page-btn:hover:not(.disabled):not(.active) {
+      background: #EFF6FF;
+      color: #1769E0;
+      border-color: #CFE1F8;
+    }
+    .page-btn.active {
+      background: #1769E0;
+      color: #FFFFFF;
+      font-weight: 700;
+      border-color: #1769E0;
+      cursor: default;
+    }
+    .page-btn.disabled {
+      background: #F5F7FA;
+      color: #A0AEC0;
+      border-color: #E4E9F0;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <partial name="_SidebarPartial" />
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Giám sát Booking & Thù lao</div>
+        <div class="page-sub">Giám sát trạng thái booking KOL và tình hình phân bổ thù lao chi tiết theo nhân sự</div>
+      </div>
+      <div class="topbar-actions">
+        <a href="/Bookings" class="btn-primary-blue" style="text-decoration:none;"><i class="ti ti-rocket"></i> Xem quản lý Booking &rarr;</a>
+      </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] is string paymentMessage)
+    {
+        <div class="card" role="status">@paymentMessage</div>
+    }
+    <!-- TAB NAVIGATION -->
+    <div class="card" style="padding: 16px 20px 0 20px; margin-bottom: 0;">
+      <div class="tab-headers">
+        <div class="tab-header active" onclick="switchTab(event, 'bookings')">
+          <i class="ti ti-star"></i> Booking KOL
+        </div>
+        <div class="tab-header" onclick="switchTab(event, 'wage-overview')">
+          <i class="ti ti-cash"></i> Tổng quan thù lao
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 1: Booking KOL -->
+    <div id="tab-bookings" class="tab-content active">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Danh sách Booking KOL/KOC - Chi tiet</div>
+            <div style="font-size: 13px; color: var(--muted);">Danh sách toàn bộ cac Hợp đồng booking KOL Đang triển khai trong hệ thống</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+        <table id="bookingTable">
+          <thead>
+            <tr>
+              <th style="width: 50px;">STT</th>
+              <th>Client & Booking</th>
+              <th>KOL / KOC</th>
+              <th style="text-align: right;">Giá Booking</th>
+              <th style="text-align: right;">Chi phí thực tế</th>
+              <th style="text-align: right;">Lợi nhuận</th>
+              <th>Trạng thái</th>
+              <th>Hợp đồng</th>
+              <th>Chi trả sau nghiệm thu</th>
+              <th style="text-align: center;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (Model.Bookings != null && Model.Bookings.Any())
+            {
+              int stt = 1;
+              foreach (var item in Model.Bookings)
+              {
+                decimal profit = item.CustomerPaidAt != null && item.Status != "huy" ? item.BookingPrice - item.ActualCost : 0;
+                string profitColor = profit >= 0 ? "var(--green)" : "var(--red)";
+                bool sentContract = (ViewBag.SentContractBookingIds as HashSet<int>)?.Contains(item.Id) == true;
+                string contractStatus = sentContract ? "Pháp chế đã chuyển" : string.IsNullOrEmpty(item.ContractFileUrl) ? "Chờ Pháp chế" : "Hồ sơ lịch sử";
+                string contractChip = sentContract || !string.IsNullOrEmpty(item.ContractFileUrl) ? "status-good" : "status-warn";
+
+                <tr class="booking-row">
+                  <td>@(stt++)</td>
+                  <td>
+                    <strong>@item.ClientName</strong>
+                    <div style="font-size: 12px; color: var(--muted);"><i class="ti ti-target"></i> @(item.Campaign?.Name ?? item.CampaignName)</div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600;">@item.KolNames</div>
+                    @if (item.Kol != null && !string.IsNullOrEmpty(item.Kol.Platform))
+                    {
+                      <span class="status-chip status-info" style="font-size: 10.5px; padding: 2px 6px;">@item.Kol.Platform</span>
+                    }
+                  </td>
+                  <td style="text-align: right; color: var(--blue-700); font-weight: 700;">@item.BookingPrice.ToString("N0") d</td>
+                  <td style="text-align: right; color: var(--text-muted);">@item.ActualCost.ToString("N0") d</td>
+                  <td style="text-align: right; color: @profitColor; font-weight: 700;">@profit.ToString("N0") d</td>
+                  <td><span class="status-chip @GetStatusChipClass(item.Status)">@item.WorkflowLabel</span></td>
+                  <td><span class="status-chip @contractChip">@contractStatus</span></td>
+                  <td><partial name="_DirectorDisbursement" model="item" /></td>
+                  <td style="text-align: center;">
+                    <a href="/Bookings/Details/@item.Id" class="btn-action-view">
+                      <i class="ti ti-eye"></i> Xem
+                    </a>
+                  </td>
+                </tr>
+              }
+            }
+            else
+            {
+              <tr>
+                <td colspan="10" style="text-align: center; color: var(--muted); padding: 30px 0;">
+                  Chưa có dữ liệu booking nào trong hệ thống.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        </div>
+        <div id="bookingPagination" class="pagination-wrapper" style="display: none;">
+          <div class="pagination-info" id="bookingPaginationInfo">Hiển thị 1-6 trong 0 booking</div>
+          <div class="pagination-controls" id="bookingPaginationControls"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Tổng quan thu lao -->
+    <div id="tab-wage-overview" class="tab-content">
+      @if (Model.Bookings != null && Model.Bookings.Any())
+      {
+        decimal sumBookingValues = Model.Bookings.Where(m => m.FinanceVersion == 1).Sum(m => m.CastPool);
+        decimal sumAllocated = Model.Bookings.Where(m => m.FinanceVersion == 1).Sum(m => m.BookingKols.Sum(bk => bk.CastAmount));
+        decimal sumRemaining = sumBookingValues - sumAllocated;
+        int totalBookings = Model.Bookings.Count(m => m.FinanceVersion == 1);
+        int totalKolAllocated = Model.Bookings.Where(m => m.FinanceVersion == 1).SelectMany(m => m.BookingKols).Select(bk => bk.KolId).Distinct().Count();
+
+        <div class="grid-3" style="margin-bottom: 20px;">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title"><i class="ti ti-cash-banknote" style="color: var(--blue-500);"></i> Tổng Quỹ cát-xê KOL</div>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--blue-700); margin: 12px 0;">@sumBookingValues.ToString("N0") d</div>
+            <div style="font-size: 12px; color: var(--muted);">Theo dõi trên @totalBookings Hợp đồng booking</div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title"><i class="ti ti-user-star" style="color: var(--green);"></i> Tổng cát-xê đã phân bổ</div>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--green); margin: 12px 0;">@sumAllocated.ToString("N0") d</div>
+            <div style="font-size: 12px; color: var(--muted);">Đã trả cho @totalKolAllocated KOL/KOC tham gia</div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title"><i class="ti ti-clock" style="color: var(--amber);"></i> Phần còn lại chưa phân bổ</div>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--amber); margin: 12px 0;">@sumRemaining.ToString("N0") d</div>
+            <div style="font-size: 12px; color: var(--muted);">Phần chưa phân bổ cho KOL/KOC</div>
+          </div>
+        </div>
+      }
+
+      <!-- FILTER CONTROLS -->
+      <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+        <div style="font-weight: 700; color: var(--navy); font-size: 14px; margin-right: 8px;">
+          <i class="ti ti-filter" style="color: var(--blue-500);"></i> Bộ lọc:
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 600; color: var(--muted);">Tháng:</label>
+          <select id="filterMonth" onchange="applyWageFilter()" style="padding: 6px 12px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--navy); background: #F8FAFC; cursor: pointer;">
+            <option value="">Tất cả</option>
+            @{
+              var months = Model.Bookings
+                .Where(b => b.CreatedAt.HasValue)
+                .Select(b => b.CreatedAt!.Value.ToString("yyyy-MM"))
+                .Distinct()
+                .OrderByDescending(m => m)
+                .ToList();
+              foreach (var m in months)
+              {
+                var dt = DateTime.Parse(m + "-01");
+                <option value="@m">@(dt.ToString("MM/yyyy"))</option>
+              }
+            }
+          </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 600; color: var(--muted);">Năm:</label>
+          <select id="filterYear" onchange="applyWageFilter()" style="padding: 6px 12px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--navy); background: #F8FAFC; cursor: pointer;">
+            <option value="">Tất cả</option>
+            @{
+              var years = Model.Bookings
+                .Where(b => b.CreatedAt.HasValue)
+                .Select(b => b.CreatedAt!.Value.Year)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToList();
+              foreach (var y in years)
+              {
+                <option value="@y">@y</option>
+              }
+            }
+          </select>
+        </div>
+        <button onclick="resetWageFilter()" style="padding: 6px 14px; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px;">
+          <i class="ti ti-x"></i> Reset
+        </button>
+        <span id="filterResultCount" style="margin-left: auto; font-size: 13px; color: var(--muted); font-weight: 600;"></span>
+      </div>
+
+      <!-- BANG THEO KOL/KOC -->
+      @if (Model.KolSummary.Any())
+      {
+        var totalKolSalary = Model.KolSummary.Sum(x => x.TotalCastAmount);
+        <div style="margin-bottom: 28px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy);">
+              <i class="ti ti-users" style="color: var(--blue-500);"></i> Bảng tổng hợp cát-xê theo KOL/KOC
+            </h3>
+            <span style="background: var(--blue-100); color: var(--blue-700); font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 12px;">@Model.KolSummary.Count người</span>
+          </div>
+          <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+              <thead>
+                <tr style="background: #F1F5F9;">
+                  <th style="width: 45px;"></th>
+                  <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">STT</th>
+                  <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">KOL / KOC</th>
+                  <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Nền tảng</th>
+                  <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Số booking</th>
+                  <th style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Tổng cát-xê</th>
+                  <th style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Tỷ lệ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @{
+                  int sttKol = 1;
+                  foreach (var kol in Model.KolSummary)
+                  {
+                    var pct = totalKolSalary > 0 ? (kol.TotalCastAmount / totalKolSalary * 100) : 0;
+                    var firstMonth = kol.BookingDetails.Any() ? kol.BookingDetails.First().CreatedAt.ToString("yyyy-MM") : "";
+                    var firstYear = kol.BookingDetails.Any() ? kol.BookingDetails.First().CreatedAt.Year.ToString() : "";
+                    <tr class="kol-summary-row wage-filter-row" data-kol-id="@kol.KolId" data-year="@firstYear" data-month="@firstMonth" style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background=''">
+                      <td style="padding: 8px; text-align: center;">
+                        <button onclick="toggleKolDetail(this, '@kol.KolId')" style="background: none; border: none; cursor: pointer; padding: 2px; color: var(--blue-500); font-size: 16px;">
+                          <i class="ti ti-chevron-down"></i>
+                        </button>
+                      </td>
+                      <td style="padding: 9px 14px; color: var(--muted); font-weight: 600;">@sttKol</td>
+                      <td style="padding: 9px 14px;">
+                        <a href="/Kols/Details/@kol.KolId" style="color: var(--primary); text-decoration: none; font-weight: 600;">@kol.KolName</a>
+                      </td>
+                      <td style="padding: 9px 14px; color: var(--ink-2);">@kol.KolPlatform</td>
+                      <td style="padding: 9px 14px; text-align: center; font-weight: 600;">@kol.BookingCount</td>
+                      <td style="padding: 9px 14px; text-align: right; font-weight: 700; color: var(--green);">@kol.TotalCastAmount.ToString("N0") d</td>
+                      <td style="padding: 9px 14px; text-align: right; color: var(--muted); font-size: 12.5px;">@pct.ToString("N1")%</td>
+                    </tr>
+                    <tr class="kol-detail-row" id="kol-detail-@kol.KolId" style="display: none; background: #FAFBFC;">
+                      <td colspan="7" style="padding: 12px 20px;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 8px;">
+                          <i class="ti ti-list"></i> Chi tiết booking của <span style="color: var(--navy);">@kol.KolName</span>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden;">
+                          <thead>
+                            <tr style="background: #EEF2F7;">
+                              <th style="padding: 8px 12px; text-align: left; font-weight: 700; font-size: 11.5px; color: var(--muted);">Client</th>
+                              <th style="padding: 8px 12px; text-align: left; font-weight: 700; font-size: 11.5px; color: var(--muted);">Booking</th>
+                              <th style="padding: 8px 12px; text-align: center; font-weight: 700; font-size: 11.5px; color: var(--muted);">Tháng</th>
+                              <th style="padding: 8px 12px; text-align: left; font-weight: 700; font-size: 11.5px; color: var(--muted);">QL phụ trách</th>
+                              <th style="padding: 8px 12px; text-align: right; font-weight: 700; font-size: 11.5px; color: var(--muted);">Cát-xê nhận được</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @foreach (var detail in kol.BookingDetails)
+                            {
+                              <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="padding: 7px 12px; font-weight: 600; color: var(--navy);">@detail.ClientName</td>
+                                <td style="padding: 7px 12px; color: var(--ink-2);">@detail.CampaignName</td>
+                                <td style="padding: 7px 12px; text-align: center; color: var(--muted); font-size: 12px;">@detail.CreatedAt.ToString("MM/yyyy")</td>
+                                <td style="padding: 7px 12px; color: var(--ink-2);">@detail.ManagerName</td>
+                                <td style="padding: 7px 12px; text-align: right; font-weight: 700; color: var(--green);">@detail.CastAmount.ToString("N0") d</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    sttKol++;
+                  }
+                }
+                <tr style="background: #F8FAFC; font-weight: 800;">
+                  <td colspan="5"><span style="color: var(--navy);">TỔNG CỘNG</span></td>
+                  <td style="padding: 10px 14px; text-align: right; color: var(--navy); font-size: 15px;">@totalKolSalary.ToString("N0") d</td>
+                  <td style="padding: 10px 14px; text-align: right; color: var(--navy);">100%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- BANG THEO QL BOOKING -->
+      @if (Model.ManagerSummary.Any())
+      {
+        var totalManagerPool = Model.ManagerSummary.Sum(x => x.TotalCastPool);
+        var totalManagerAllocated = Model.ManagerSummary.Sum(x => x.TotalAllocated);
+        <div style="margin-bottom: 28px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy);">
+              <i class="ti ti-user-star" style="color: var(--amber);"></i> Bảng tổng hợp theo QL Booking phụ trách
+            </h3>
+            <span style="background: var(--amber-bg); color: var(--amber); font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 12px;">@Model.ManagerSummary.Count người</span>
+          </div>
+          <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+              <thead>
+                <tr style="background: #F1F5F9;">
+                  <th style="width: 45px;"></th>
+                  <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">STT</th>
+                  <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">QL Booking</th>
+                  <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Số booking</th>
+                  <th style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Tổng Quỹ cát-xê</th>
+                  <th style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Tổng đã phân bổ</th>
+                  <th style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--navy); font-size: 12px; text-transform: uppercase;">Còn lại</th>
+                </tr>
+              </thead>
+              <tbody>
+                @{
+                  int sttMgr = 1;
+                  foreach (var mgr in Model.ManagerSummary)
+                  {
+                    var remaining = mgr.TotalCastPool - mgr.TotalAllocated;
+                    var mgrFirstMonth = mgr.BookingDetails.Any() ? mgr.BookingDetails.First().CreatedAt.ToString("yyyy-MM") : "";
+                    var mgrFirstYear = mgr.BookingDetails.Any() ? mgr.BookingDetails.First().CreatedAt.Year.ToString() : "";
+                    <tr class="mgr-summary-row wage-filter-row" data-mgr-id="@mgr.ManagerId" data-year="@mgrFirstYear" data-month="@mgrFirstMonth" style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background=''">
+                      <td style="padding: 8px; text-align: center;">
+                        <button onclick="toggleMgrDetail(this, '@mgr.ManagerId')" style="background: none; border: none; cursor: pointer; padding: 2px; color: var(--amber); font-size: 16px;">
+                          <i class="ti ti-chevron-down"></i>
+                        </button>
+                      </td>
+                      <td style="padding: 9px 14px; color: var(--muted); font-weight: 600;">@sttMgr</td>
+                      <td style="padding: 9px 14px; font-weight: 600; color: var(--ink-2);">@mgr.ManagerName</td>
+                      <td style="padding: 9px 14px; text-align: center; font-weight: 600;">@mgr.BookingCount</td>
+                      <td style="padding: 9px 14px; text-align: right; font-weight: 700; color: var(--blue-700);">@mgr.TotalCastPool.ToString("N0") d</td>
+                      <td style="padding: 9px 14px; text-align: right; font-weight: 700; color: var(--green);">@mgr.TotalAllocated.ToString("N0") d</td>
+                      <td style="padding: 9px 14px; text-align: right; font-weight: 700; color: @(remaining < 0 ? "var(--danger)" : "var(--amber)");">@remaining.ToString("N0") d</td>
+                    </tr>
+                    <tr class="mgr-detail-row" id="mgr-detail-@mgr.ManagerId" style="display: none; background: #FAFBFC;">
+                      <td colspan="7" style="padding: 12px 20px;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 8px;">
+                          <i class="ti ti-list"></i> Chi tiết booking của <span style="color: var(--navy);">@mgr.ManagerName</span>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden;">
+                          <thead>
+                            <tr style="background: #EEF2F7;">
+                              <th style="padding: 8px 12px; text-align: left; font-weight: 700; font-size: 11.5px; color: var(--muted);">Client</th>
+                              <th style="padding: 8px 12px; text-align: left; font-weight: 700; font-size: 11.5px; color: var(--muted);">Booking</th>
+                              <th style="padding: 8px 12px; text-align: center; font-weight: 700; font-size: 11.5px; color: var(--muted);">Tháng</th>
+                              <th style="padding: 8px 12px; text-align: center; font-weight: 700; font-size: 11.5px; color: var(--muted);">KOL/KOC</th>
+                              <th style="padding: 8px 12px; text-align: right; font-weight: 700; font-size: 11.5px; color: var(--muted);">Quỹ cát-xê</th>
+                              <th style="padding: 8px 12px; text-align: right; font-weight: 700; font-size: 11.5px; color: var(--muted);">Đã phân bổ</th>
+                              <th style="padding: 8px 12px; text-align: right; font-weight: 700; font-size: 11.5px; color: var(--muted);">Còn lại</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @foreach (var detail in mgr.BookingDetails)
+                            {
+                              var detRemaining = detail.CastPool - detail.Allocated;
+                              <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="padding: 7px 12px; font-weight: 600; color: var(--navy);">@detail.ClientName</td>
+                                <td style="padding: 7px 12px; color: var(--ink-2);">@detail.CampaignName</td>
+                                <td style="padding: 7px 12px; text-align: center; color: var(--muted); font-size: 12px;">@detail.CreatedAt.ToString("MM/yyyy")</td>
+                                <td style="padding: 7px 12px; text-align: center; color: var(--ink-2);">@detail.KolCount</td>
+                                <td style="padding: 7px 12px; text-align: right; font-weight: 700; color: var(--blue-700);">@detail.CastPool.ToString("N0") d</td>
+                                <td style="padding: 7px 12px; text-align: right; font-weight: 700; color: var(--green);">@detail.Allocated.ToString("N0") d</td>
+                                <td style="padding: 7px 12px; text-align: right; font-weight: 700; color: @(detRemaining < 0 ? "var(--danger)" : "var(--amber)");">@detRemaining.ToString("N0") d</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    sttMgr++;
+                  }
+                }
+                <tr style="background: #F8FAFC; font-weight: 800;">
+                  <td colspan="3"><span style="color: var(--navy);">TỔNG CỘNG</span></td>
+                  <td style="padding: 10px 14px; text-align: center; color: var(--navy); font-size: 15px;">@Model.ManagerSummary.Sum(x => x.BookingCount)</td>
+                  <td style="padding: 10px 14px; text-align: right; color: var(--navy); font-size: 15px;">@totalManagerPool.ToString("N0") d</td>
+                  <td style="padding: 10px 14px; text-align: right; color: var(--navy); font-size: 15px;">@totalManagerAllocated.ToString("N0") d</td>
+                  <td style="padding: 10px 14px; text-align: right; color: var(--navy); font-size: 15px;">@((totalManagerPool - totalManagerAllocated).ToString("N0")) d</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+
+  </main>
+</div>
+
+<script>
+  function switchTab(event, tabId) {
+    const headers = document.querySelectorAll('.tab-header');
+    headers.forEach(h => h.classList.remove('active'));
+    event.target.closest('.tab-header').classList.add('active');
+
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+  }
+
+  function toggleKolDetail(btn, kolId) {
+    const row = document.getElementById('kol-detail-' + kolId);
+    const icon = btn.querySelector('i');
+    if (row.style.display === 'none') {
+      row.style.display = 'table-row';
+      icon.classList.remove('ti-chevron-down');
+      icon.classList.add('ti-chevron-up');
+    } else {
+      row.style.display = 'none';
+      icon.classList.remove('ti-chevron-up');
+      icon.classList.add('ti-chevron-down');
+    }
+  }
+
+  function toggleMgrDetail(btn, managerId) {
+    const row = document.getElementById('mgr-detail-' + managerId);
+    const icon = btn.querySelector('i');
+    if (row.style.display === 'none') {
+      row.style.display = 'table-row';
+      icon.classList.remove('ti-chevron-down');
+      icon.classList.add('ti-chevron-up');
+    } else {
+      row.style.display = 'none';
+      icon.classList.remove('ti-chevron-up');
+      icon.classList.add('ti-chevron-down');
+    }
+  }
+
+  function applyWageFilter() {
+    const monthVal = document.getElementById('filterMonth').value;
+    const yearVal = document.getElementById('filterYear').value;
+    let visibleCount = 0;
+
+    document.querySelectorAll('.kol-summary-row').forEach(function(row) {
+      const rowMonth = row.getAttribute('data-month');
+      const rowYear = row.getAttribute('data-year');
+      const show = (!monthVal || rowMonth === monthVal) && (!yearVal || rowYear === yearVal);
+      row.style.display = show ? '' : 'none';
+      if (show) {
+        visibleCount++;
+        const kolId = row.getAttribute('data-kol-id');
+        const detailRow = document.getElementById('kol-detail-' + kolId);
+        if (detailRow) detailRow.style.display = 'none';
+      }
+    });
+
+    document.querySelectorAll('.mgr-summary-row').forEach(function(row) {
+      const rowMonth = row.getAttribute('data-month');
+      const rowYear = row.getAttribute('data-year');
+      const show = (!monthVal || rowMonth === monthVal) && (!yearVal || rowYear === yearVal);
+      row.style.display = show ? '' : 'none';
+      if (show) {
+        const mgrId = row.getAttribute('data-mgr-id');
+        const detailRow = document.getElementById('mgr-detail-' + mgrId);
+        if (detailRow) detailRow.style.display = 'none';
+      }
+    });
+
+    const filterCount = document.getElementById('filterResultCount');
+    if (filterCount) {
+      filterCount.innerText = monthVal || yearVal ? 'Hiển thị ' + visibleCount + ' nguoi' : '';
+    }
+  }
+
+  function resetWageFilter() {
+    document.getElementById('filterMonth').value = '';
+    document.getElementById('filterYear').value = '';
+    applyWageFilter();
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('#bookingTable tbody tr.booking-row');
+    const totalItems = rows.length;
+    const pageSize = 6;
+    const paginationWrapper = document.getElementById('bookingPagination');
+    const infoEl = document.getElementById('bookingPaginationInfo');
+    const controlsEl = document.getElementById('bookingPaginationControls');
+
+    if (totalItems === 0) {
+      if (paginationWrapper) paginationWrapper.style.display = 'none';
+      return;
+    }
+
+    const totalPages = Math.ceil(totalItems / pageSize);
+    let currentPage = 1;
+
+    function renderPage(page) {
+      currentPage = Math.max(1, Math.min(page, totalPages));
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, totalItems);
+
+      rows.forEach((row, index) => {
+        row.style.display = (index >= startIndex && index < endIndex) ? '' : 'none';
+      });
+
+      if (infoEl) infoEl.innerText = 'Hiển thị ' + (startIndex + 1) + '-' + endIndex + ' trong ' + totalItems + ' booking';
+
+      if (controlsEl) {
+        controlsEl.innerHTML = '';
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'page-btn' + (currentPage === 1 ? ' disabled' : '');
+        prevBtn.innerText = '<';
+        if (currentPage > 1) prevBtn.onclick = () => renderPage(currentPage - 1);
+        else prevBtn.disabled = true;
+        controlsEl.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+          const btn = document.createElement('button');
+          btn.className = 'page-btn' + (i === currentPage ? ' active' : '');
+          btn.innerText = i;
+          if (i !== currentPage) btn.onclick = () => renderPage(i);
+          else btn.disabled = true;
+          controlsEl.appendChild(btn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'page-btn' + (currentPage === totalPages ? ' disabled' : '');
+        nextBtn.innerText = '>';
+        if (currentPage < totalPages) nextBtn.onclick = () => renderPage(currentPage + 1);
+        else nextBtn.disabled = true;
+        controlsEl.appendChild(nextBtn);
+      }
+
+      if (paginationWrapper) paginationWrapper.style.display = 'flex';
+    }
+
+    renderPage(1);
+  });
+</script>
+</body>
+</html>

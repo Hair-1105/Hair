@@ -1,0 +1,1064 @@
+@model IEnumerable<HanaMedia.Models.Booking>
+@using HanaMedia.Constants
+@using System.Security.Claims
+@{
+    Layout = null;
+    var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
+    var campaigns = ViewBag.Campaigns as IEnumerable<HanaMedia.Models.Campaign> ?? Enumerable.Empty<HanaMedia.Models.Campaign>();
+    var kols = ViewBag.Kols as IEnumerable<HanaMedia.Models.Kol> ?? Enumerable.Empty<HanaMedia.Models.Kol>();
+    var employees = ViewBag.Employees as IEnumerable<HanaMedia.Models.Employee> ?? Enumerable.Empty<HanaMedia.Models.Employee>();
+
+    int? selectedCampaignId = ViewBag.CampaignId;
+    int? selectedKolId = ViewBag.KolId;
+    int? selectedManagerId = ViewBag.ManagerId;
+    string selectedStatus = ViewBag.Status ?? string.Empty;
+    string searchKeyword = ViewBag.Search ?? string.Empty;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Quản lý Booking</title>
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+  <style>
+    :root {
+      --primary-blue: #0B3A6E;
+      --secondary-blue: #2563EB;
+      --light-blue: #EFF6FF;
+      --bg-color: #F5F8FC;
+      --white: #FFFFFF;
+      --text-color: #17324D;
+      --muted-text: #64748B;
+      --success-color: #16A34A;
+      --warning-color: #D97706;
+      --danger-color: #DC2626;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(11, 58, 110, 0.05);
+      border: 1px solid rgba(11, 58, 110, 0.08);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .status-dang_cho { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .status-thuong_luong { background: #eff6ff; color: var(--secondary-blue); border: 1px solid #bfdbfe; }
+    .status-da_chot { background: #fffbeb; color: var(--warning-color); border: 1px solid #fde68a; }
+    .status-dang_trien_khai { background: #fae8ff; color: #a21caf; border: 1px solid #f5d0fe; }
+    .status-hoan_thanh { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .status-huy { background: #fee2e2; color: var(--danger-color); border: 1px solid #fca5a5; }
+
+    .btn-primary-blue {
+      background-color: var(--primary-blue) !important;
+      color: var(--white) !important;
+      border: none !important;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.15s ease;
+      text-decoration: none;
+    }
+    .btn-primary-blue:hover {
+      background-color: var(--secondary-blue) !important;
+    }
+
+    .btn-action {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 550;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      background: transparent;
+      border: 1px solid transparent;
+    }
+    .btn-action-view {
+      color: var(--primary-blue);
+      border-color: rgba(11, 58, 110, 0.15);
+      background: #f8fafc;
+    }
+    .btn-action-view:hover {
+      background: #f1f5f9;
+    }
+    .btn-action-edit {
+      color: var(--secondary-blue);
+      border-color: rgba(37, 99, 235, 0.15);
+      background: #eff6ff;
+    }
+    .btn-action-edit:hover {
+      background: #dbeafe;
+    }
+    .btn-action-delete {
+      color: var(--danger-color);
+      border-color: rgba(220, 38, 38, 0.15);
+      background: #fff5f5;
+    }
+    .btn-action-delete:hover {
+      background: #fee2e2;
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: #64748b;
+      border: 1.5px solid #cbd5e1;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-secondary:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+      color: #334155;
+    }
+
+    /* Modal styling matching standard 3-part layout */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-card {
+      background: var(--white);
+      width: 100%;
+      max-width: 680px;
+      border-radius: 14px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary-blue);
+    }
+    .modal-close {
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--muted-text);
+    }
+    .modal-close:hover {
+      color: var(--danger-color);
+    }
+    #bookingForm {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      overscroll-behavior: contain;
+    }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-color);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #d2ddec;
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text-color);
+      box-sizing: border-box;
+    }
+    .form-control:focus {
+      border-color: var(--secondary-blue);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 550;
+      cursor: pointer;
+    }
+
+    .kol-multiselect {
+      width: 100%; padding: 10px 14px; border: 1px solid #d2ddec; border-radius: 8px;
+      background: white; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+      font-size: 14px; color: var(--text-color); transition: border-color 0.15s;
+    }
+    .kol-multiselect:hover, .kol-multiselect.active { border-color: var(--secondary-blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .kol-multiselect-panel {
+      position: fixed; z-index: 9999; background: white; border: 1px solid var(--line);
+      border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,0.18); margin-top: 4px;
+      width: 420px; max-height: 380px; display: none; flex-direction: column;
+    }
+    .kol-multiselect-panel.open { display: flex; }
+    .kol-search-row { padding: 10px; border-bottom: 1px solid var(--line); }
+    .kol-list { flex: 1; overflow-y: auto; padding: 6px 0; max-height: 260px; }
+    .kol-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .kol-item:hover { background: var(--blue-50); }
+    .kol-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--secondary-blue); cursor: pointer; }
+    .kol-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--blue-50); color: var(--blue-600);
+      display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+    }
+    .kol-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .kol-meta strong { font-size: 13.5px; color: var(--primary-blue); }
+    .kol-platform { font-size: 11.5px; color: var(--muted-text); }
+    .kol-item.hidden { display: none; }
+    .kol-footer {
+      padding: 8px 14px; border-top: 1px solid var(--line);
+      display: flex; justify-content: space-between; align-items: center; background: #f8fafc;
+    }
+    .form-hint { color: var(--muted-text); font-size: 11.5px; margin-top: 6px; display: block; }
+    .kol-multiselect.has-selection { border-color: var(--secondary-blue); }
+
+    .finance-legend {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 12px 16px; margin: 4px 0 16px;
+      background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+      border: 1px solid #bfdbfe; border-left: 4px solid var(--secondary-blue);
+      border-radius: 8px; font-size: 13px; color: var(--text-color); line-height: 1.55;
+    }
+    .finance-legend i { margin-top: 2px; flex-shrink: 0; }
+    .finance-legend strong { color: var(--primary-blue); }
+
+    /* KOL SECTION (cuối form) */
+    .kol-section-wrapper {
+      margin-top: 20px;
+      padding: 16px;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+    .kol-section-header {
+      display: flex; align-items: center; gap: 10px;
+      padding-bottom: 14px; margin-bottom: 14px;
+      border-bottom: 2px solid var(--secondary-blue);
+    }
+
+    /* KOL WAGE TABLE */
+    .kol-wage-table-wrapper {
+      margin-top: 16px;
+      background: white;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .kol-wage-table {
+      width: 100%; border-collapse: collapse; font-size: 13.5px;
+    }
+    .kol-wage-table th, .kol-wage-table td {
+      padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left;
+    }
+    .kol-wage-table th {
+      background: #f1f5f9; font-weight: 700; font-size: 11.5px;
+      text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted);
+    }
+    .kol-wage-table td.num, .kol-wage-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .kol-wage-table tfoot td {
+      background: #f8fafc; border-top: 2px solid var(--primary-blue);
+      border-bottom: none; color: var(--primary-blue);
+    }
+    .kol-wage-amount {
+      width: 100%; padding: 7px 10px;
+      border: 1px solid #d2ddec; border-radius: 6px; font-size: 13.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .kol-wage-amount:focus { outline: none; border-color: var(--secondary-blue); box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
+    .kol-wage-remove {
+      background: transparent; border: none; color: var(--danger);
+      cursor: pointer; padding: 4px 8px; border-radius: 4px;
+    }
+    .kol-wage-remove:hover { background: var(--danger-bg); }
+  </style>
+</head>
+<body>
+<div class="layout">
+  
+  <partial name="_SidebarPartial" />
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 class="page-title">Quản lý Booking &amp; Booking</h1>
+        <div class="page-sub">Theo dõi, điều phối lịch trình hợp tác và chi tiết hoạt động Booking của KOL/KOC</div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <a href="/ManageBooking/Dashboard" class="btn-primary-blue" style="background-color: var(--secondary-blue) !important;"><i class="ti ti-chart-bar"></i> Xem Dashboard</a>
+        @if (ViewBag.IsWritable)
+        {
+          <button class="btn-primary-blue" onclick="openCreateModal()"><i class="ti ti-plus"></i> Tạo Booking mới</button>
+        }
+      </div>
+    </div>
+
+    <!-- Alert messages -->
+    @if ((role is AppRoles.BookingManager or AppRoles.BookingStaff) && (int)ViewBag.EmployeeId == 0)
+    {
+      <div class="alert alert-warning" style="margin-bottom: 20px;">Tài khoản chưa liên kết hồ sơ nhân sự. Vui lòng liên hệ Admin IT/HCNS để liên kết trước khi tạo Booking và nhận hoa hồng.</div>
+    }
+    @if (TempData["SuccessMessage"] != null)
+    {
+      <div class="alert alert-success" style="margin-bottom: 20px;">
+        <i class="ti ti-circle-check"></i> @TempData["SuccessMessage"]
+      </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+      <div class="alert alert-danger" style="margin-bottom: 20px;">
+        <i class="ti ti-alert-circle"></i> @TempData["ErrorMessage"]
+      </div>
+    }
+
+    <!-- BỘ LỌC TÌM KIẾM -->
+    <div class="card" style="padding: 16px 20px; margin-bottom: 24px;">
+      <form method="get" action="/Bookings" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+        <div><label class="form-label">Nhân viên tham gia</label><select class="form-control" name="participantId"><option value="">Tất cả nhân viên</option>@foreach(var emp in employees){<option value="@emp.Id" selected="@((int?)ViewBag.ParticipantId==emp.Id)">@emp.FullName — @emp.Department</option>}</select></div>
+        <div style="flex: 2; min-width: 200px;">
+          <label class="form-label" style="margin-bottom: 4px;">Tìm kiếm</label>
+          <input class="form-control" type="search" name="search" value="@searchKeyword" placeholder="Tên khách hàng, Booking, ghi chú (có/không dấu)...">
+        </div>
+        <div style="flex: 1; min-width: 130px;">
+          <label class="form-label" style="margin-bottom: 4px;">KOL / KOC</label>
+          <select class="form-control" name="kolId">
+            <option value="">-- Tất cả --</option>
+            @foreach (var kol in kols)
+            {
+              <option value="@kol.Id" selected="@(selectedKolId == kol.Id)">@kol.Name</option>
+            }
+          </select>
+        </div>
+        <div style="flex: 1; min-width: 130px;">
+          <label class="form-label" style="margin-bottom: 4px;">Trạng thái hợp tác</label>
+          <select class="form-control" name="status">
+            <option value="">-- Tất cả --</option>
+            <option value="dang_cho" selected="@(selectedStatus == "dang_cho")">Chờ</option>
+            <option value="da_duyet" selected="@(selectedStatus == "da_duyet")">Giám đốc duyệt</option>
+            <option value="da_nghiem_thu" selected="@(selectedStatus == "da_nghiem_thu")">Đã nghiệm thu</option>
+            <option value="dang_trien_khai" selected="@(selectedStatus == "dang_trien_khai")">Đang chạy</option>
+            <option value="hoan_thanh" selected="@(selectedStatus == "hoan_thanh")">Hoàn thành</option>
+            <option value="huy" selected="@(selectedStatus == "huy")">Hủy</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn-primary-blue"><i class="ti ti-filter"></i> Lọc</button>
+          @if (!string.IsNullOrEmpty(searchKeyword) || selectedCampaignId.HasValue || selectedKolId.HasValue || !string.IsNullOrEmpty(selectedStatus) || ViewBag.ParticipantId != null || selectedManagerId.HasValue)
+          {
+            <a href="/Bookings" class="btn-secondary" style="text-decoration: none; padding: 9px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center;"><i class="ti ti-refresh"></i> Xóa</a>
+          }
+        </div>
+      </form>
+    </div>
+
+    <!-- BẢNG DANH SÁCH BOOKING -->
+    <div class="card" style="padding: 0; overflow-x: auto;">
+      <table class="table" style="margin: 0; width: 100%;">
+        <thead>
+          <tr>
+            <th>Khách hàng / Booking</th>
+            <th>KOL / KOC</th>
+            <th>Thời hạn (Deadline)</th>
+            <th style="text-align: right;">Giá Booking</th>
+            <th style="text-align: right;">Chi phí thực tế</th>
+            <th>Người phụ trách</th>
+            <th>Trạng thái</th>
+            <th style="text-align: right; width: 180px;">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (!Model.Any())
+          {
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--muted-text); padding: 40px; font-style: italic;">
+                Không tìm thấy dữ liệu Booking nào.
+              </td>
+            </tr>
+          }
+          else
+          {
+            foreach (var item in Model)
+            {
+              var statusClass = item.Status switch
+              {
+                "dang_cho" => "status-dang_cho",
+                "thuong_luong" => "status-thuong_luong",
+                "da_chot" => "status-da_chot",
+                "dang_trien_khai" => "status-dang_trien_khai",
+                "hoan_thanh" => "status-hoan_thanh",
+                "huy" => "status-huy",
+                _ => "status-dang_cho"
+              };
+              var statusLabel = item.Status switch
+              {
+                "dang_cho" => "Chờ",
+                "thuong_luong" => "Thương lượng",
+                "da_chot" => "Chốt",
+                "dang_trien_khai" => "Triển khai",
+                "hoan_thanh" => "Hoàn thành",
+                "huy" => "Hủy",
+                _ => item.Status
+              };
+
+              <tr>
+                <td>
+                  <div style="font-weight: 700; color: var(--primary-blue);">@item.ClientName</div>
+                  <div style="font-size: 12.5px; color: var(--muted-text);">Booking: @(item.Campaign?.Name ?? item.CampaignName)</div>
+                </td>
+                <td>
+                  <div style="font-weight: 600;">@item.KolNames</div>
+                  <div style="font-size: 11px; color: var(--muted-text);">@(string.Join(", ", item.BookingKols.Select(k=>k.Kol?.Platform).Where(p=>!string.IsNullOrWhiteSpace(p)).Distinct()))</div>
+                </td>
+                <td style="font-size: 13.5px; font-weight: 550;">
+                  <div>@item.Deadline.ToString("dd/MM/yyyy")</div>
+                  @if (item.PostingDate.HasValue)
+                  {
+                    <div style="font-size: 11.5px; color: var(--success-color); font-weight: normal;">Đăng ngày: @item.PostingDate.Value.ToString("dd/MM/yyyy")</div>
+                  }
+                </td>
+                <td style="text-align: right; font-weight: 600; color: var(--primary-blue);">@item.BookingPrice.ToString("N0") VNĐ</td>
+                <td style="text-align: right; font-weight: 600; color: var(--danger-color);">@item.ActualCost.ToString("N0") VNĐ</td>
+                <td>
+                  <div style="font-weight: 550;">@(item.PrimaryManager?.FullName ?? "N/A")</div>
+                  <div style="font-size: 11px; color: var(--muted-text);">@item.PrimaryManager?.Position</div>
+                </td>
+                <td>
+                  <span class="status-badge @statusClass">@item.WorkflowLabel</span>
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                    <a href="/Bookings/Details/@item.Id" class="btn-action btn-action-view"><i class="ti ti-eye"></i>Chi tiết</a>
+                    @if (ViewBag.IsWritable && item.PrimaryManagerId == (int)ViewBag.EmployeeId && (item.ContractStatus is "nhap" or "tu_choi"))
+                    {
+                      <button class="btn-action btn-action-edit" data-booking='@Json.Serialize(new { id = item.Id, clientName = item.ClientName, campaignName = item.CampaignName, campaignId = item.CampaignId, kolId = item.KolId, kolIds = item.BookingKols.Select(k => k.KolId).ToArray(), bookingKols = item.BookingKols.Select(k => new { kolId = k.KolId, castAmount = k.AllocationAmount }).ToArray(), jobDescription = item.JobDescription, bookingPrice = item.BookingPrice, actualCost = item.ActualCost, financeVersion = item.FinanceVersion, commissionPercent = item.CommissionPercent, castPercent = item.CastPercent, primaryManagerId = item.PrimaryManagerId, status = item.Status, postLink = item.PostLink, notes = item.Notes })' data-revenuedate="@((item.RevenueDate ?? item.CreatedAt)?.ToString("yyyy-MM-dd"))" data-deadline="@item.Deadline.ToString("yyyy-MM-dd")" data-postingdate="@(item.PostingDate?.ToString("yyyy-MM-dd") ?? "")" onclick="openEditModal(this)"><i class="ti ti-edit"></i>Sửa</button>
+                      <form method="post" action="/Bookings/Delete/@item.Id" style="display:inline;" onsubmit="return confirm('Hủy Booking này và giữ lại lịch sử?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn-action btn-action-delete"><i class="ti ti-trash"></i>Hủy</button>
+                      </form>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- FORM MODAL THÊM / SỬA BOOKING -->
+@if (ViewBag.IsWritable == true)
+{
+<div class="modal-overlay" id="bookingModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Tạo Booking mới</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <form id="bookingForm" method="post" enctype="multipart/form-data">
+      @Html.AntiForgeryToken()
+      <div class="modal-body">
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Thông tin Booking</label>
+            <p class="form-hint">Booking độc lập — nhập đối tác, tên Booking và ngân sách bên dưới.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Khách hàng (Client) *</label>
+            <input class="form-control" name="ClientName" id="bookingClientName" required maxlength="150" placeholder="Nhập tên đối tác/Client">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="grid-column: span 2;">
+            <label class="form-label">Tên Booking *</label>
+            <input class="form-control" name="CampaignName" id="bookingCampaignName" placeholder="Tên Booking sẽ tự điền khi chọn ở trên — có thể sửa lại">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nội dung công việc (Job Description)</label>
+          <textarea class="form-control" name="JobDescription" id="bookingJobDescription" rows="2" placeholder="Ví dụ: Đăng bài review, làm video TikTok,..."></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ngày ghi nhận Booking *</label>
+            <input class="form-control" type="date" name="RevenueDate" id="bookingRevenueDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" min="1900-01-01" max="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+            <small>Chọn ngày thực tế của Booking cũ để báo cáo vào đúng tháng.</small>
+            <label class="form-label">Hạn chót hoàn thành (Deadline) *</label>
+            <input class="form-control" type="date" name="deadlineStr" id="bookingDeadline" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ngày bài đăng lên sóng (Posting Date)</label>
+            <input class="form-control" type="date" name="postingDateStr" id="bookingPostingDate">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ngân sách / Giá trị hợp đồng Booking (VNĐ) *</label>
+            <input class="form-control" type="number" name="BookingPrice" id="bookingPrice" min="0.01" step="0.01" required placeholder="Ví dụ: 10000000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phân bổ tự động (theo Booking Price)</label>
+            <input class="form-control" id="bookingActualCost" readonly placeholder="Sẽ tự tính">
+          </div>
+        </div>
+
+        @* Hidden finance fields — set cứng theo quy tắc 50% phần công ty · 10% QL · 40% KOL/KOC *@
+        <input type="hidden" name="FinanceVersion" value="1" />
+        <input type="hidden" name="CompanyPercent" value="50" id="bookingCompanyPercent" />
+        <input type="hidden" name="CommissionPercent" value="10" id="bookingCommissionPercent" />
+        <input type="hidden" name="CastPercent" value="40" id="bookingCastPercent" />
+
+        <div class="finance-legend">
+          <i class="ti ti-info-circle" style="color: var(--secondary-blue);"></i>
+          <span>
+            Tổng giá trị booking sẽ được phân bổ tự động:
+            <strong>50%</strong> phần công ty,
+            <strong>10%</strong> hoa hồng người phụ trách Booking,
+            <strong>40%</strong> cát-xê KOL tự tính từ giá trị phân bổ.
+          </span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">File Hợp đồng (Contract File)</label>
+            <p style="font-size:13px; color:var(--text-muted); margin:0;">Upload hợp đồng tại trang chi tiết sau khi Giám đốc duyệt Booking.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bản nghiệm thu</label>
+            <p style="font-size:13px; color:var(--text-muted); margin:0;">Upload bản nghiệm thu tại trang chi tiết khi hoàn thành Booking đã ký.</p>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Link bài viết / Video đã đăng</label>
+            <input class="form-control" type="url" name="PostLink" id="bookingPostLink" placeholder="https://tiktok.com/...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Người phụ trách Booking</label>
+            <input type="hidden" name="PrimaryManagerId" id="bookingPrimaryManagerId" value="@ViewBag.EmployeeId" />
+            <input class="form-control" value="@(employees.FirstOrDefault(e => e.Id == (int)ViewBag.EmployeeId)?.FullName ?? "Bạn")" readonly />
+            <small class="form-hint">Tự gán theo tài khoản đang đăng nhập.</small>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Trạng thái Booking</label>
+            <select class="form-control" name="Status" id="bookingStatus">
+              <option value="dang_cho">Chờ</option>
+              <option value="huy">Hủy</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ghi chú</label>
+            <input class="form-control" name="Notes" id="bookingNotes" placeholder="Ghi chú thêm...">
+          </div>
+        </div>
+
+        @* === KOL/KOC + CHIA THÙ LAO THỦ CÔNG (đặt cuối form) === *@
+        <div class="kol-section-wrapper">
+          <div class="kol-section-header">
+            <i class="ti ti-users-group" style="color: var(--secondary-blue); font-size: 18px;"></i>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--primary-blue);">KOL / KOC THAM GIA &amp; CHIA THÙ LAO</h3>
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Chọn KOL / KOC quảng cáo * <span style="color:var(--muted-text);font-weight:normal;font-size:12.5px;">(chọn 1 hoặc nhiều, tối đa 10)</span></label>
+            <button type="button" class="kol-multiselect" id="kolDropdownBtn" onclick="toggleKolDropdown(event)" aria-haspopup="listbox" aria-expanded="false">
+              <span id="kolDropdownLabel"><i class="ti ti-users-group" style="margin-right:6px;color:var(--blue-500);"></i>-- Chọn KOL/KOC --</span>
+              <i class="ti ti-chevron-down" style="color:var(--muted-text);"></i>
+            </button>
+            <div class="kol-multiselect-panel" id="kolDropdownPanel" role="listbox">
+              <div class="kol-search-row">
+                <input type="text" class="form-control" id="kolSearchInput" placeholder="Tìm theo tên hoặc nền tảng..." oninput="filterKolList()" />
+              </div>
+              <div class="kol-list" id="kolList">
+                @foreach (var kol in kols)
+                {
+                  <label class="kol-item" data-name="@(kol.Name.ToLower()) @((kol.Platform ?? "").ToLower())" data-kol-id="@kol.Id">
+                    <input type="checkbox" name="kolIds" value="@kol.Id" class="kol-checkbox" onchange="updateKolSelection()" />
+                    <div class="kol-avatar"><i class="ti ti-user-star"></i></div>
+                    <div class="kol-meta">
+                      <strong>@kol.Name</strong>
+                      <span class="kol-platform">@kol.Platform</span>
+                    </div>
+                  </label>
+                }
+                @if (!kols.Any())
+                {
+                  <div style="padding:14px;color:var(--muted-text);font-style:italic;text-align:center;">Chưa có KOL/KOC hoạt động. Liên hệ Quản lý Ý tưởng để thêm hồ sơ KOL/KOC.</div>
+                }
+              </div>
+              <div class="kol-footer">
+                <button type="button" class="btn-mini" onclick="clearKolSelection()" style="color:var(--muted-text);">Bỏ chọn</button>
+                <button type="button" class="btn-mini approve" onclick="closeKolDropdown()">Xong</button>
+              </div>
+            </div>
+            <small class="form-hint" id="kolHint">Nhập giá trị phân bổ cho từng KOL; tổng phải bằng ngân sách. KOL nhận 40% phần được phân bổ.</small>
+          </div>
+
+          <div class="kol-wage-table-wrapper" id="kolWageTableWrapper" hidden>
+            <table class="kol-wage-table">
+              <thead>
+                <tr>
+                  <th style="width:36px;">#</th>
+                  <th>KOL / KOC</th>
+                  <th>Nền tảng</th>
+                  <th style="width:200px;">Giá trị phân bổ (VNĐ)</th>
+                  <th style="width:80px;" class="num">KOL nhận 40%</th>
+                  <th style="width:80px;"></th>
+                </tr>
+              </thead>
+              <tbody id="kolWageTableBody"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3"><strong>Tổng phân bổ</strong></td>
+                  <td><strong id="kolWageTotal">0 đ</strong></td>
+                  <td colspan="2" id="kolWageTotalPct" class="num">0%</td>
+                </tr>
+                <tr>
+                  <td colspan="6" style="font-size:12px; color:var(--text-muted);">
+                    <i class="ti ti-info-circle"></i> Nhập giá trị phân bổ cho từng KOL. Tổng phải bằng ngân sách Booking; KOL tự nhận 40% giá trị được phân bổ.
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal()">Hủy</button>
+        <button type="submit" class="btn-primary-blue" style="padding: 9px 20px;">Lưu lại</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const COMPANY_PCT = 50, COMMISSION_PCT = 10, CAST_PCT = 40;
+// Danh sách KOL active (từ server) để build bảng thù lao
+const KOL_CATALOG = [
+  @foreach (var kol in kols)
+  {
+    @:{ id: @kol.Id, name: "@Html.Raw(kol.Name.Replace("\"", "\\\""))", platform: "@Html.Raw(kol.Platform.Replace("\"", "\\\""))" },
+  }
+];
+
+// Map kolId -> số tiền override thủ công (dùng cho cả create + edit)
+let manualCastMap = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const price = document.getElementById('bookingPrice');
+  price.addEventListener('input', () => {
+    const p = Number(price.value) || 0;
+    const company = Math.round(p * COMPANY_PCT) / 100;
+    const q1 = Math.round(p * COMMISSION_PCT) / 100;
+    const cast = Math.round(p * CAST_PCT) / 100;
+    const actualCost = q1 + cast;
+    document.getElementById('bookingActualCost').value = actualCost.toFixed(2);
+    refreshWageTotals();
+  });
+});
+
+  function syncCampaignDetails(select) {
+    const selectedOption = select.options[select.selectedIndex];
+    const clientNameInput = document.getElementById('bookingClientName');
+    const campaignNameInput = document.getElementById('bookingCampaignName');
+
+    if (selectedOption && selectedOption.value) {
+      clientNameInput.value = selectedOption.getAttribute('data-client') || '';
+      campaignNameInput.value = selectedOption.text;
+    }
+  }
+
+  function openCreateModal() {
+    document.getElementById('modalTitle').innerText = 'Tạo Booking mới';
+    document.getElementById('bookingForm').action = '/Bookings/Create';
+    document.getElementById('bookingForm').reset();
+    manualCastMap = {};
+    rebuildKolWageTable();
+    document.getElementById('bookingPrice').dispatchEvent(new Event('input'));
+    clearKolSelection();
+    closeKolDropdown();
+    document.getElementById('bookingModal').classList.add('active');
+  }
+
+  function openEditModal(btn) {
+    const booking = JSON.parse(btn.getAttribute('data-booking'));
+    const deadline = btn.getAttribute('data-deadline');
+    const postingDate = btn.getAttribute('data-postingdate');
+    document.getElementById('bookingRevenueDate').value = btn.getAttribute('data-revenuedate') || '';
+
+    document.getElementById('modalTitle').innerText = 'Cập nhật Booking ID: ' + booking.id;
+    document.getElementById('bookingForm').action = '/Bookings/Edit/' + booking.id;
+
+    document.getElementById('bookingClientName').value = booking.clientName || '';
+    document.getElementById('bookingCampaignName').value = booking.campaignName || '';
+
+    // Multi-select KOL + load CastAmount hiện tại (nếu backend trả kèm bookingKols)
+    const kolIds = booking.kolIds?.length ? booking.kolIds : (booking.kolId ? [booking.kolId] : []);
+    manualCastMap = {};
+    if (Array.isArray(booking.bookingKols) && booking.bookingKols.length) {
+      booking.bookingKols.forEach(bk => { manualCastMap[bk.kolId] = bk.castAmount; });
+    } else if (booking.castAmount) {
+      manualCastMap[kolIds[0]] = booking.castAmount;
+    }
+    document.querySelectorAll('.kol-checkbox').forEach(cb => {
+      cb.checked = kolIds.includes(Number(cb.value));
+    });
+    updateKolSelection();
+    rebuildKolWageTable();
+    closeKolDropdown();
+
+    document.getElementById('bookingJobDescription').value = booking.jobDescription || '';
+    document.getElementById('bookingDeadline').value = deadline || '';
+    document.getElementById('bookingPostingDate').value = postingDate || '';
+    document.getElementById('bookingPrice').value = booking.bookingPrice || 0;
+    document.getElementById('bookingPrice').dispatchEvent(new Event('input'));
+    document.getElementById('bookingPostLink').value = booking.postLink || '';
+    document.getElementById('bookingPrimaryManagerId').value = booking.primaryManagerId || '';
+    document.getElementById('bookingStatus').value = booking.status || 'dang_cho';
+    document.getElementById('bookingNotes').value = booking.notes || '';
+    document.getElementById('bookingModal').classList.add('active');
+  }
+
+  function closeModal() {
+    document.getElementById('bookingModal').classList.remove('active');
+    closeKolDropdown();
+  }
+
+  // ===== KOL Multi-select =====
+  // Sử dụng "portal": khi mở, panel được gắn vào document.body để tránh mọi ancestor có
+  // transform/overflow/position gây cản trở position: fixed. Khi đóng, trả về vị trí cũ.
+  let _kolPanelOriginalParent = null;
+  let _kolPanelOriginalNextSibling = null;
+  function toggleKolDropdown(e) {
+    e.stopPropagation();
+    const panel = document.getElementById('kolDropdownPanel');
+    const btn = document.getElementById('kolDropdownBtn');
+    if (!panel.classList.contains('open')) {
+      // Portal panel ra body
+      if (panel.parentElement !== document.body) {
+        _kolPanelOriginalParent = panel.parentElement;
+        _kolPanelOriginalNextSibling = panel.nextSibling;
+        document.body.appendChild(panel);
+      }
+      const rect = btn.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const MIN_PANEL_H = 200;
+      // LUÔN mở dưới button. Nếu không đủ chỗ, tự co chiều cao panel (không flip-up).
+      let top = rect.bottom + 4;
+      const availableBelow = viewportH - top - 16;
+      const desiredH = 380;
+      const finalH = Math.max(MIN_PANEL_H, Math.min(desiredH, availableBelow));
+      panel.style.position = 'fixed';
+      panel.style.top = top + 'px';
+      panel.style.left = rect.left + 'px';
+      panel.style.width = Math.max(420, rect.width) + 'px';
+      panel.style.height = finalH + 'px';
+      panel.style.maxHeight = finalH + 'px';
+      panel.classList.add('open');
+      btn.classList.add('active');
+      btn.setAttribute('aria-expanded', 'true');
+      setTimeout(() => document.getElementById('kolSearchInput')?.focus(), 50);
+    } else {
+      closeKolDropdown();
+    }
+  }
+  function closeKolDropdown() {
+    const panel = document.getElementById('kolDropdownPanel');
+    const btn = document.getElementById('kolDropdownBtn');
+    if (panel) {
+      panel.classList.remove('open');
+      panel.style.height = '';
+      panel.style.maxHeight = '';
+      // Trả panel về vị trí ban đầu
+      if (_kolPanelOriginalParent && panel.parentElement === document.body) {
+        if (_kolPanelOriginalNextSibling) {
+          _kolPanelOriginalParent.insertBefore(panel, _kolPanelOriginalNextSibling);
+        } else {
+          _kolPanelOriginalParent.appendChild(panel);
+        }
+      }
+    }
+    if (btn) { btn.classList.remove('active'); btn.setAttribute('aria-expanded', 'false'); }
+  }
+  // Cập nhật vị trí panel khi window resize / scroll bên trong modal-body
+  function repositionKolPanelIfOpen() {
+    const panel = document.getElementById('kolDropdownPanel');
+    const btn = document.getElementById('kolDropdownBtn');
+    if (!panel || !panel.classList.contains('open') || !btn) return;
+    const rect = btn.getBoundingClientRect();
+    const viewportH = window.innerHeight;
+    let top = rect.bottom + 4;
+    const availableBelow = viewportH - top - 16;
+    const MIN_PANEL = 200, DESIRED = 380;
+    const finalH = Math.max(MIN_PANEL, Math.min(DESIRED, availableBelow));
+    panel.style.top = top + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.style.width = Math.max(420, rect.width) + 'px';
+    panel.style.height = finalH + 'px';
+    panel.style.maxHeight = finalH + 'px';
+  }
+  window.addEventListener('resize', repositionKolPanelIfOpen);
+  document.addEventListener('scroll', (e) => {
+    if (e.target && (e.target.classList?.contains('modal-body') || e.target.closest?.('.modal-body'))) {
+      repositionKolPanelIfOpen();
+    }
+  }, true);
+  function updateKolSelection() {
+    const checked = Array.from(document.querySelectorAll('.kol-checkbox:checked'));
+    const label = document.getElementById('kolDropdownLabel');
+    const btn = document.getElementById('kolDropdownBtn');
+    const hint = document.getElementById('kolHint');
+    if (checked.length === 0) {
+      label.innerHTML = '<i class="ti ti-users-group" style="margin-right:6px;color:var(--blue-500);"></i>-- Chọn KOL/KOC --';
+      btn.classList.remove('has-selection');
+      hint.textContent = 'Nhập giá trị phân bổ cho từng KOL; tổng phải bằng ngân sách. KOL nhận 40% phần được phân bổ.';
+    } else {
+      const names = checked.map(cb => cb.closest('.kol-item').querySelector('strong').textContent);
+      label.innerHTML = `<i class="ti ti-users-group" style="margin-right:6px;color:var(--green);"></i>Đã chọn ${checked.length}: <strong style="color:var(--primary-blue);margin-left:4px;">${names.slice(0, 2).join(', ')}${names.length > 2 ? ` +${names.length - 2}` : ''}</strong>`;
+      btn.classList.add('has-selection');
+      hint.innerHTML = `<i class="ti ti-info-circle" style="color:var(--secondary-blue);"></i> Đã chọn <strong>${checked.length}</strong> KOL/KOC. Nhập giá trị phân bổ bên dưới; KOL nhận 40%.`;
+    }
+    rebuildKolWageTable();
+  }
+  function clearKolSelection() {
+    document.querySelectorAll('.kol-checkbox').forEach(cb => cb.checked = false);
+    updateKolSelection();
+  }
+  function filterKolList() {
+    const q = document.getElementById('kolSearchInput').value.toLowerCase().trim();
+    document.querySelectorAll('.kol-item').forEach(item => {
+      const name = item.getAttribute('data-name');
+      item.classList.toggle('hidden', q && !name.includes(q));
+    });
+  }
+  // ===== KOL Wage Table (chia thù lao thủ công) =====
+  function getSelectedKols() {
+    return Array.from(document.querySelectorAll('.kol-checkbox:checked'))
+      .map(cb => {
+        const id = Number(cb.value);
+        const meta = KOL_CATALOG.find(k => k.id === id);
+        return { id, name: meta?.name || '#' + id, platform: meta?.platform || '' };
+      });
+  }
+  function rebuildKolWageTable() {
+    const wrapper = document.getElementById('kolWageTableWrapper');
+    const body = document.getElementById('kolWageTableBody');
+    if (!wrapper || !body) return;
+    const kols = getSelectedKols();
+    if (kols.length === 0) {
+      wrapper.hidden = true;
+      body.innerHTML = '';
+      refreshWageTotals();
+      return;
+    }
+    wrapper.hidden = false;
+    const price = Number(document.getElementById('bookingPrice').value) || 0;
+    const defaultShare = price / kols.length;
+    kols.forEach(k => {
+      if (manualCastMap[k.id] == null || isNaN(manualCastMap[k.id])) {
+        manualCastMap[k.id] = Math.round(defaultShare * 100) / 100;
+      }
+    });
+    Object.keys(manualCastMap).forEach(id => {
+      if (!kols.find(k => k.id === Number(id))) delete manualCastMap[id];
+    });
+    body.innerHTML = kols.map((k, idx) => {
+      const value = manualCastMap[k.id] ?? 0;
+      return '<tr data-kol-id="' + k.id + '">' +
+        '<td>' + (idx + 1) + '</td>' +
+        '<td><strong>' + escapeHtml(k.name) + '</strong></td>' +
+        '<td><span class="platform-tag">' + escapeHtml(k.platform) + '</span></td>' +
+        '<td><input type="number" class="kol-wage-amount" data-kol-amount name="kolCastAmount[' + k.id + ']" value="' + value.toFixed(2) + '" min="0" step="0.01" oninput="onWageChanged(' + k.id + ', this.value)" /></td>' +
+        '<td class="num" data-kol-pct>0%</td>' +
+        '<td><button type="button" class="kol-wage-remove" onclick="removeKolFromSelection(' + k.id + ')" title="Bỏ KOL này"><i class="ti ti-x"></i></button></td>' +
+        '</tr>';
+    }).join('');
+    refreshWageTotals();
+  }
+  function onWageChanged(kolId, value) {
+    manualCastMap[kolId] = Number(value) || 0;
+    refreshWageTotals();
+  }
+  function removeKolFromSelection(kolId) {
+    const cb = document.querySelector('.kol-checkbox[value="' + kolId + '"]');
+    if (cb) {
+      cb.checked = false;
+      delete manualCastMap[kolId];
+      updateKolSelection();
+    }
+  }
+  function distributeCastEqually() {
+    const kols = getSelectedKols();
+    if (kols.length === 0) return;
+    const price = Number(document.getElementById('bookingPrice').value) || 0;
+    const castPool = price;
+    const share = Math.floor(castPool / kols.length * 100) / 100;
+    kols.forEach((k, idx) => {
+      manualCastMap[k.id] = idx === kols.length - 1
+        ? Math.round((castPool - share * (kols.length - 1)) * 100) / 100
+        : share;
+    });
+    rebuildKolWageTable();
+  }
+  function setCastFromDefault() { distributeCastEqually(); }
+  function refreshWageTotals() {
+    const kols = getSelectedKols();
+    const price = Number(document.getElementById('bookingPrice').value) || 0;
+    let total = 0;
+    kols.forEach(k => { total += Number(manualCastMap[k.id]) || 0; });
+    const totalEl = document.getElementById('kolWageTotal');
+    const pctEl = document.getElementById('kolWageTotalPct');
+    if (totalEl) totalEl.textContent = total.toLocaleString('vi-VN') + ' đ';
+    if (pctEl) pctEl.textContent = price > 0 ? (total / price * 100).toFixed(2) + '%' : '0%';
+    kols.forEach(k => {
+      const tr = document.querySelector('#kolWageTableBody tr[data-kol-id="' + k.id + '"]');
+      if (!tr) return;
+      const pctCell = tr.querySelector('[data-kol-pct]');
+      if (pctCell) pctCell.textContent = ((Number(manualCastMap[k.id]) || 0) * 0.4).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' đ';
+    });
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  // Đóng panel khi click ra ngoài
+  document.addEventListener('click', (e) => {
+    const panel = document.getElementById('kolDropdownPanel');
+    if (!panel || !panel.classList.contains('open')) return;
+    if (!e.target.closest('#kolDropdownPanel') && !e.target.closest('#kolDropdownBtn')) {
+      closeKolDropdown();
+    }
+  });
+
+  // Validate trước khi submit
+  document.getElementById('bookingForm').addEventListener('submit', (e) => {
+    const checked = document.querySelectorAll('.kol-checkbox:checked');
+    if (checked.length === 0) {
+      e.preventDefault();
+      alert('Vui lòng chọn ít nhất 1 KOL/KOC.');
+      return;
+    }
+    if (checked.length > 10) {
+      e.preventDefault();
+      alert('Mỗi booking tối đa 10 KOL/KOC. Hiện đã chọn ' + checked.length + '.');
+      return;
+    }
+    const amounts = document.querySelectorAll('#kolWageTableBody [data-kol-amount]');
+    const totalCents = Array.from(amounts).reduce((sum, inp) => sum + Math.round(Number(inp.value) * 100), 0);
+      const budgetCents = Math.round(Number(document.getElementById('bookingPrice').value) * 100);
+      if (totalCents !== budgetCents) { e.preventDefault(); alert('Tổng giá trị phân bổ phải bằng ngân sách Booking.'); return; }
+      for (const inp of amounts) {
+      const v = Number(inp.value);
+      if (!isFinite(v) || v <= 0) {
+        e.preventDefault();
+        alert('Vui lòng nhập số tiền phân bổ hợp lệ (> 0) cho tất cả KOL/KOC.');
+        inp.focus();
+        return;
+      }
+    }
+  });
+</script>
+}
+</body>
+</html>

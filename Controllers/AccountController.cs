@@ -1,0 +1,532 @@
+using System.Globalization;
+using System.Net;
+using System.Security.Claims;
+using HanaMedia.Constants;
+using HanaMedia.Models;
+using HanaMedia.Services;
+using HanaMedia.Services.Auditing;
+using HanaMedia.Services.Config;
+using HanaMedia.Services.Security;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace HanaMedia.Controllers;
+
+public sealed class AccountController : Controller
+{
+    private const string InvalidCredentialsMessage =
+        "Tên đăng nhập hoặc mật khẩu không chính xác.";
+
+    private readonly ApplicationDbContext _context;
+    private readonly AccountService _accountService;
+    private readonly IAccountPasswordService _passwordService;
+    private readonly IConfiguration _configuration;
+    private readonly ISystemAuditService _auditService;
+    private readonly IIpAccessControlService _ipAccessControlService;
+    private readonly IClientIpResolver _ipResolver;
+    private readonly ISystemConfigService _configService;
+    private readonly ILogger<AccountController> _logger;
+    private readonly IWebHostEnvironment _environment;
+
+    public AccountController(
+        ApplicationDbContext context,
+        AccountService accountService,
+        IAccountPasswordService passwordService,
+        IConfiguration configuration,
+        ISystemAuditService auditService,
+        IIpAccessControlService ipAccessControlService,
+        IClientIpResolver ipResolver,
+        ISystemConfigService configService,
+        ILogger<AccountController> logger,
+        IWebHostEnvironment environment)
+    {
+        _context = context;
+        _accountService = accountService;
+        _passwordService = passwordService;
+        _configuration = configuration;
+        _auditService = auditService;
+        _ipAccessControlService = ipAccessControlService;
+        _ipResolver = ipResolver;
+        _configService = configService;
+        _logger = logger;
+        _environment = environment;
+    }
+
+    [AllowAnonymous]
+    [Route("")]
+    [Route("Login")]
+    [HttpGet]
+    public IActionResult Login()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            return RedirectToDashboard(User.FindFirstValue(ClaimTypes.Role));
+        }
+
+        return View();
+    }
+
+    [AllowAnonymous]
+    [Route("Login")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Login(
+        string username,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        username = username?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
+        {
+            ViewBag.Error = "Tên đăng nhập và mật khẩu không được để trống.";
+            return View();
+        }
+
+        var clientIp = _ipResolver.GetClientIp(HttpContext);
+        var accessDecision = await _ipAccessControlService.EvaluateAccessAsync(clientIp, cancellationToken);
+
+        if (!accessDecision.IsAllowed)
+        {
+            _logger.LogWarning(
+                "[NetworkCheck] BLOCKED - Client IP: {ClientIp}, MatchedRule: {MatchedRule}, RuleType: {RuleType}, Reason: {Reason}",
+                clientIp,
+                accessDecision.MatchedRule,
+                accessDecision.RuleType,
+                accessDecision.Reason);
+
+            await TryWriteAuditAsync(
+                null,
+                AuditActions.LoginBlockedNetwork,
+                $"Chặn đăng nhập từ IP {Truncate(clientIp, 45)}. Lý do: {accessDecision.Reason}",
+                cancellationToken);
+
+            ViewBag.NetworkError = "Vui lòng kết nối mạng nội bộ công ty để sử dụng hệ thống.";
+            return View();
+        }
+
+        _logger.LogInformation(
+            "[NetworkCheck] PASSED - Client IP {ClientIp} is allowed ({Reason})",
+            clientIp,
+            accessDecision.Reason);
+
+        var (result, user, message) =
+            await _accountService.AuthenticateAsync(username, password);
+
+        switch (result)
+        {
+            case LoginResult.Success:
+                await TryWriteAuditAsync(
+                    user!.Id,
+                    AuditActions.LoginSucceeded,
+                    $"Tài khoản {user.Username} đăng nhập thành công.",
+                    cancellationToken);
+
+                var claims = new List<Claim>
+                {
+                    new(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
+                    new(ClaimTypes.Name, user.Username),
+                    new(ClaimTypes.Email, user.Email),
+                    new(ClaimTypes.Role, user.Role),
+                    new(SecurityClaimTypes.SecurityStamp, user.SecurityStamp)
+                };
+                var claimsIdentity = new ClaimsIdentity(
+                    claims,
+                    CookieAuthenticationDefaults.AuthenticationScheme);
+
+                var sysConfig = await _configService.GetConfigAsync(cancellationToken);
+                var sessionTimeoutMins = Math.Max(1, sysConfig.SessionTimeoutMinutes);
+                var now = DateTimeOffset.UtcNow;
+
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    IssuedUtc = now,
+                    ExpiresUtc = now.AddMinutes(sessionTimeoutMins),
+                    AllowRefresh = true
+                };
+
+                await HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    new ClaimsPrincipal(claimsIdentity),
+                    authProperties);
+                return RedirectToDashboard(user.Role);
+
+            case LoginResult.AccountLockedTemporarily:
+                await TryWriteAuditAsync(
+                    user?.Id,
+                    AuditActions.LoginFailed,
+                    $"Tài khoản {Truncate(username, 100)} đang bị khóa tạm thời.",
+                    cancellationToken);
+                ViewBag.LockoutError = message;
+                return View();
+
+            case LoginResult.AccountInactive:
+                await TryWriteAuditAsync(
+                    user?.Id,
+                    AuditActions.LoginFailed,
+                    $"Tài khoản {Truncate(username, 100)} đang bị khóa.",
+                    cancellationToken);
+                ViewBag.Error = message;
+                return View();
+
+            case LoginResult.UserNotFound:
+            case LoginResult.WrongPassword:
+            default:
+                await TryWriteAuditAsync(
+                    user?.Id,
+                    AuditActions.LoginFailed,
+                    $"Đăng nhập thất bại với định danh {Truncate(username, 100)}.",
+                    cancellationToken);
+                ViewBag.Error = string.IsNullOrWhiteSpace(message)
+                    ? InvalidCredentialsMessage
+                    : message;
+                return View();
+        }
+    }
+
+    [Authorize]
+    [Route("Logout")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> Logout(CancellationToken cancellationToken)
+        => SignOutCurrentUserAsync(cancellationToken);
+
+    // Giữ tương thích với các view cũ của develop đang dùng liên kết GET /Logout.
+    [Authorize]
+    [Route("Logout")]
+    [HttpGet]
+    public Task<IActionResult> LogoutLegacy(CancellationToken cancellationToken)
+        => SignOutCurrentUserAsync(cancellationToken);
+
+    [AllowAnonymous]
+    [Route("AccessDenied")]
+    [HttpGet]
+    public IActionResult AccessDenied() => View();
+
+    // POST: /Account/ChangePassword
+    // Body: { currentPassword, newPassword, confirmPassword }
+    [Authorize]
+    [Route("ChangePassword")]
+    [Route("Account/ChangePassword")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest? input,
+        CancellationToken cancellationToken)
+    {
+        if (input == null
+            || string.IsNullOrEmpty(input.CurrentPassword)
+            || string.IsNullOrEmpty(input.NewPassword)
+            || string.IsNullOrEmpty(input.ConfirmPassword))
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Vui lòng nhập đầy đủ cả 3 trường."
+            });
+        }
+
+        if (input.NewPassword.Length < 8)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Mật khẩu mới phải có ít nhất 8 ký tự."
+            });
+        }
+
+        if (input.NewPassword != input.ConfirmPassword)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Mật khẩu mới và Xác nhận mật khẩu không khớp nhau."
+            });
+        }
+
+        if (input.NewPassword == input.CurrentPassword)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Mật khẩu mới phải khác mật khẩu hiện tại."
+            });
+        }
+
+        var identifier = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(
+                identifier,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var userId))
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Phiên đăng nhập không hợp lệ."
+            });
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(
+            u => u.Id == userId,
+            cancellationToken);
+        if (user == null)
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "Không tìm thấy tài khoản."
+            });
+        }
+
+        var verification = _passwordService.VerifyPassword(user, input.CurrentPassword);
+        if (verification != PasswordVerificationStatus.Success)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Mật khẩu hiện tại không chính xác."
+            });
+        }
+
+        user.PasswordHash = _passwordService.HashPassword(user, input.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        await TryWriteAuditAsync(
+            userId,
+            "change_password",
+            $"Tài khoản {user.Username} đổi mật khẩu.",
+            cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Đổi mật khẩu thành công."
+        });
+    }
+
+    public sealed class ChangePasswordRequest
+    {
+        public string? CurrentPassword { get; set; }
+        public string? NewPassword { get; set; }
+        public string? ConfirmPassword { get; set; }
+    }
+
+    private async Task<IActionResult> SignOutCurrentUserAsync(
+        CancellationToken cancellationToken)
+    {
+        var identifier = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(
+                identifier,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var userId))
+        {
+            await TryWriteAuditAsync(
+                userId,
+                AuditActions.Logout,
+                $"Tài khoản {User.Identity?.Name} đăng xuất.",
+                cancellationToken);
+        }
+
+        await HttpContext.SignOutAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme);
+        return RedirectToAction(nameof(Login));
+    }
+
+    private string GetClientIpAddress()
+    {
+        // CHỈ dùng RemoteIpAddress - không tin header X-Forwarded-For/X-Real-IP
+        // để tránh IP spoofing attack
+        return NormalizeIpAddress(
+            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+    }
+
+    private static string NormalizeIpAddress(string ip)
+        => ip.StartsWith("::ffff:", StringComparison.OrdinalIgnoreCase)
+            ? ip[7..]
+            : ip;
+
+    private bool IsIpInRange(string ipAddress, string cidr)
+    {
+        try
+        {
+            if (!cidr.Contains('/'))
+            {
+                return string.Equals(
+                    ipAddress.Trim(),
+                    cidr.Trim(),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+
+            var parts = cidr.Split('/');
+            var networkAddress = IPAddress.Parse(parts[0].Trim());
+            var prefixLength = int.Parse(parts[1].Trim(), CultureInfo.InvariantCulture);
+            var clientIp = IPAddress.Parse(ipAddress);
+            var ipBytes = clientIp.GetAddressBytes();
+            var networkBytes = networkAddress.GetAddressBytes();
+
+            if (ipBytes.Length != 4 || networkBytes.Length != 4 ||
+                prefixLength is < 0 or > 32)
+            {
+                return false;
+            }
+
+            var ipValue = BitConverter.ToUInt32(ipBytes.Reverse().ToArray(), 0);
+            var networkValue = BitConverter.ToUInt32(networkBytes.Reverse().ToArray(), 0);
+            var mask = prefixLength == 0
+                ? 0U
+                : uint.MaxValue << (32 - prefixLength);
+            return (ipValue & mask) == (networkValue & mask);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "[IpCheck] Error parsing IP range: {Cidr}, IP: {Ip}",
+                cidr,
+                ipAddress);
+            return false;
+        }
+    }
+
+    private IActionResult RedirectToDashboard(string? role)
+        => role switch
+        {
+            AppRoles.Director => RedirectToAction("Dashboard", "Director"),
+            AppRoles.AdminIT => RedirectToAction("Dashboard", "AdminIT"),
+            AppRoles.HumanResourcesManager => RedirectToAction("HumanResources", "ManageHuman"),
+            AppRoles.HumanResourcesStaff => RedirectToAction("HumanResources", "HumanResourcesStaff"),
+            AppRoles.BookingManager => RedirectToAction("Dashboard", "ManageBooking"),
+            AppRoles.BookingStaff => RedirectToAction("Index", "Booking"),
+            AppRoles.IdeaManager => RedirectToAction("Dashboard", "ManageIdea"),
+            AppRoles.IdeaStaff => RedirectToAction("Idea", "IdeaStaff"),
+            AppRoles.LegalStaff => RedirectToAction("Index", "Legal"),
+            AppRoles.Accountant => RedirectToAction("Receivables", "Accounting"),
+            _ => RedirectToAction("Index", "Home")
+        };
+
+    private async Task TryWriteAuditAsync(
+        int? userId,
+        string actionType,
+        string detail,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _auditService.AddAccountEvent(userId, actionType, detail);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                exception,
+                "Không thể ghi audit xác thực {ActionType} cho user {UserId}.",
+                actionType,
+                userId);
+        }
+    }
+
+    private static string Truncate(string value, int maxLength)
+        => value.Length <= maxLength ? value : value[..maxLength];
+
+    #region Session Status & Renewal API Endpoints
+
+    [HttpGet("/api/auth/session")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetSessionStatus(CancellationToken cancellationToken)
+    {
+        var isAuth = User.Identity?.IsAuthenticated == true;
+        var now = DateTimeOffset.UtcNow;
+
+        if (!isAuth)
+        {
+            return StatusCode(StatusCodes.Status401Unauthorized, new
+            {
+                authenticated = false,
+                serverTime = now,
+                expiresAt = (DateTimeOffset?)null,
+                remainingSeconds = 0,
+                code = "UNAUTHORIZED"
+            });
+        }
+
+        var authResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        var expiresAt = authResult.Properties?.ExpiresUtc;
+
+        if (!expiresAt.HasValue || now >= expiresAt.Value)
+        {
+            return StatusCode(StatusCodes.Status401Unauthorized, new
+            {
+                authenticated = false,
+                serverTime = now,
+                expiresAt = (DateTimeOffset?)null,
+                remainingSeconds = 0,
+                code = "SESSION_EXPIRED"
+            });
+        }
+
+        var remainingSeconds = Math.Max(0, (int)(expiresAt.Value - now).TotalSeconds);
+        var sysConfig = await _configService.GetConfigAsync(cancellationToken);
+
+        return Ok(new
+        {
+            authenticated = true,
+            serverTime = now,
+            expiresAt = expiresAt.Value,
+            remainingSeconds,
+            sessionTimeoutMinutes = sysConfig.SessionTimeoutMinutes
+        });
+    }
+
+    [HttpPost("/api/auth/renew")]
+    public async Task<IActionResult> RenewSession(CancellationToken cancellationToken)
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return StatusCode(StatusCodes.Status401Unauthorized, new
+            {
+                success = false,
+                message = "Phiên đăng nhập không tồn tại hoặc đã hết hạn.",
+                code = "UNAUTHORIZED"
+            });
+        }
+
+        var sysConfig = await _configService.GetConfigAsync(cancellationToken);
+        var timeoutMinutes = Math.Max(1, sysConfig.SessionTimeoutMinutes);
+        var now = DateTimeOffset.UtcNow;
+        var newExpiresUtc = now.AddMinutes(timeoutMinutes);
+
+        var authResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        var authProperties = authResult.Properties ?? new AuthenticationProperties();
+
+        authProperties.IssuedUtc = now;
+        authProperties.ExpiresUtc = newExpiresUtc;
+        authProperties.AllowRefresh = true;
+        authProperties.IsPersistent = true;
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            User,
+            authProperties);
+
+        _logger.LogInformation("Session renewed for user {Username}. New expiration: {ExpiresUtc}", User.Identity?.Name, newExpiresUtc);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Phiên làm việc đã được gia hạn thành công.",
+            serverTime = now,
+            expiresAt = newExpiresUtc,
+            remainingSeconds = (int)(newExpiresUtc - now).TotalSeconds
+        });
+    }
+
+    #endregion
+}

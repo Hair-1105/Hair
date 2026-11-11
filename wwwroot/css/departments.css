@@ -1,0 +1,52 @@
+/* Scoped additions to the shared HanaMedia layout, cards and tables. */
+.departments-page .departments-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:24px; }
+.departments-page .department-readonly { display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:white; color:var(--ink-2); font-size:13px; }
+.departments-page .kpi-label, .departments-page .kpi-note, .departments-page .card-sub { color:var(--ink-2); }
+.departments-page .department-filters { display:grid; grid-template-columns:minmax(0,1fr) 230px; gap:16px; padding-bottom:20px; }
+.departments-page .department-filters label { display:grid; gap:7px; font-size:12px; font-weight:600; color:var(--ink-2); }
+.departments-page .department-filters :is(input,select) { width:100%; height:42px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:white; font-size:13px; color:var(--ink); }
+.departments-page :is(input,select,button,a,[tabindex]):focus-visible { outline:2px solid var(--blue-500); outline-offset:3px; }
+.departments-page .department-table-region { overflow-x:auto; }
+.departments-page .department-table { table-layout:fixed; min-width:720px; }
+.departments-page .department-col-name { width:30%; }
+.departments-page .department-col-manager { width:23%; }
+.departments-page .department-col-count { width:10%; }
+.departments-page .department-col-status { width:20%; }
+.departments-page .department-col-link { width:17%; }
+.departments-page .department-table th { padding:13px 14px; background:var(--blue-50); color:var(--ink-2); }
+.departments-page .department-table td { padding:18px 14px; vertical-align:middle; overflow-wrap:anywhere; }
+.departments-page .department-table tbody tr:hover { background:#f8faff; }
+.departments-page .department-name { display:block; font-size:14px; font-weight:700; color:var(--navy); line-height:1.5; }
+.departments-page .department-code { display:block; font-size:12px; color:var(--ink-2); margin-top:4px; }
+.departments-page .department-number { text-align:right; font-variant-numeric:tabular-nums; }
+.departments-page td.department-number { font-weight:700; color:var(--navy); }
+.departments-page .department-unassigned { color:var(--ink-2); font-style:italic; }
+.departments-page .department-status { display:inline-flex; align-items:center; gap:6px; line-height:1.4; padding:5px 9px; border-radius:6px; font-size:12px; }
+.departments-page .department-status.is-active { color:#12633f; background:var(--green-bg); }
+.departments-page .department-status.is-inactive { color:#80551a; background:var(--amber-bg); }
+.departments-page .department-link { color:var(--blue-700); font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; min-height:36px; }
+.departments-page .department-link:hover { text-decoration:underline; }
+.departments-page .department-empty { text-align:center; padding:36px 18px; color:var(--ink-2); }
+.departments-page .department-error { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px; margin-bottom:16px; border-radius:8px; background:var(--red-bg); color:#982e2e; font-size:13px; }
+.departments-page [hidden] { display:none !important; }
+.departments-page .department-cards { display:none; }
+.department-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:767px) {
+  .departments-page .department-filters { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .departments-page .department-table-region { display:none; }
+  .departments-page .department-cards { display:grid; gap:12px; }
+  .departments-page .department-item { border:1px solid var(--line); border-radius:10px; padding:16px; min-width:0; }
+  .departments-page .department-item-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+  .departments-page .department-item-head > div { min-width:0; overflow-wrap:anywhere; }
+  .departments-page .department-item dl { display:grid; grid-template-columns:1fr auto; gap:10px 16px; margin:0 0 12px; font-size:13px; }
+  .departments-page .department-item dt { color:var(--ink-2); }
+  .departments-page .department-item dd { margin:0; text-align:right; overflow-wrap:anywhere; }
+  .departments-page .department-link { min-height:42px; }
+  .departments-page .department-error { align-items:flex-start; flex-direction:column; }
+}
+@media(max-width:600px) {
+  .departments-page .departments-summary { grid-template-columns:minmax(0,1fr); gap:10px; }
+  .departments-page .departments-summary .kpi-card { min-height:0; display:grid; grid-template-columns:1fr auto; gap:6px 12px; padding:14px 16px; align-items:center; }
+  .departments-page .kpi-value { margin:0; grid-column:2; grid-row:1 / 3; font-size:27px; }
+  .departments-page .kpi-note { margin:0; grid-column:1; }
+}

@@ -1,0 +1,70 @@
+@model HanaMedia.ViewModels.BookingStaffViewModel
+@using System.Globalization
+@{ var moneyCulture = CultureInfo.GetCultureInfo("vi-VN"); }
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HanaMedia — Nhiệm vụ Booking của tôi</title>
+  <link rel="stylesheet" href="~/css/tabler-icons/tabler-icons.min.css">
+  <link rel="stylesheet" href="~/css/design-system.css">
+  <link rel="stylesheet" href="~/css/layout.css">
+  <link rel="stylesheet" href="~/css/components.css">
+</head>
+<body>
+<div class="layout">
+  <partial name="_SidebarPartial" />
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Nhiệm vụ Booking &amp; Thù lao cá nhân</div>
+        <div class="page-sub">Theo dõi booking được phân công, thời hạn, hợp đồng và thù lao của bạn</div>
+        <a href="/Bookings" class="btn btn-primary">Quản lý Booking &amp; chia cát-xê</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Danh sách booking tham gia (@Model.Bookings.Count)</div></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Client &amp; Campaign</th><th>KOL/KOC</th><th>Thời hạn (Deadline)</th>
+            <th>Thù lao của tôi</th><th>Trạng thái Booking</th>
+            <th style="text-align:right;">Hành động</th>
+          </tr></thead>
+          <tbody>
+          @if (!Model.Bookings.Any())
+          {
+            <tr><td colspan="6" style="padding:28px; text-align:center; color:var(--muted);">
+              @(Model.HasEmployeeProfile ? "Bạn chưa được phân công tham gia booking nào." : "Tài khoản chưa liên kết hồ sơ nhân sự. Vui lòng liên hệ HCNS hoặc Admin IT.")
+            </td></tr>
+          }
+          @foreach (var booking in Model.Bookings)
+          {
+            <tr>
+              <td><strong>@booking.ClientName</strong><br><span style="color:var(--muted);font-size:12px;">#@booking.Id · @booking.CampaignName</span></td>
+              <td>@(booking.KolNames.Count > 0 ? string.Join(", ", booking.KolNames) : booking.LegacyKolName ?? "—")</td>
+              <td>@booking.Deadline.ToString("dd/MM/yyyy")</td>
+              <td style="color:var(--blue-700);font-weight:700;white-space:nowrap;">@booking.AllocatedWage.ToString("N0", moneyCulture) đ</td>
+              <td><span class="status-chip @(booking.Status == "hoan_thanh" ? "status-good" : booking.Status == "huy" ? "status-bad" : "status-info")">@booking.StatusLabel</span></td>
+              <td style="text-align:right;white-space:nowrap;">
+                @if (booking.HasSafePostLink)
+                {
+                  <a href="@booking.PostLink" target="_blank" rel="noopener noreferrer" class="btn-mini">Bài đăng</a>
+                }
+                <a href="/Bookings/Details/@booking.Id" class="btn-mini">Xem chi tiết</a>
+                @if (booking.ContractStatus is "da_duyet" or "phap_ly_tu_choi")
+                {
+                  <a href="/Bookings/Details/@booking.Id" class="btn-mini approve">Cập nhật hợp đồng</a>
+                }
+              </td>
+            </tr>
+          }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
